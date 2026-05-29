@@ -1,4 +1,4 @@
-const { ChannelType, AttachmentBuilder } = require('discord.js');
+const { ChannelType, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { generateRosterImage } = require('../utils/canvasGen');
 
 module.exports = {
@@ -106,16 +106,35 @@ module.exports = {
                     await player.memberObj.voice.setChannel(channelTeam2);
                     await new Promise(resolve => setTimeout(resolve, 200));
                 }
-                await message.channel.send('✅ **Jogadores movidos para os canais de voz das equipes! Bom jogo!**');
             } catch (error) {
                 console.error(error);
                 await message.channel.send('❌ Ocorreu um erro ao tentar mover os jogadores.');
             }
         }
 
+        // Salva a partida na memória para controle
         message.client.activeMatches.set(message.guild.id, {
             team1Data: team1.map(p => ({ id: p.id, name: p.name })),
             team2Data: team2.map(p => ({ id: p.id, name: p.name }))
+        });
+
+        // 🆕 Cria os botões para registrar a vitória
+        const rowVitoria = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('btn_vitoria_time1')
+                .setLabel('Vitória do TIME 1')
+                .setEmoji('🔵')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId('btn_vitoria_time2')
+                .setLabel('Vitória do TIME 2')
+                .setEmoji('🔴')
+                .setStyle(ButtonStyle.Danger)
+        );
+
+        await message.channel.send({ 
+            content: '✅ **Jogadores movidos! Bom jogo!**\n\n👇 *Quando a partida acabar, cliquem no botão abaixo para registrar o vencedor:*', 
+            components: [rowVitoria] 
         });
     },
 };

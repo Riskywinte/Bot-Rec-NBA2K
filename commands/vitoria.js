@@ -4,14 +4,14 @@ const { getDB } = require('../database');
 module.exports = {
     name: 'vitoria',
     description: 'Registra o resultado (Uso: !vitoria time1 ou !vitoria time2)',
-    
+
     async execute(message, args) {
         const winnerTeam = args[0]?.toLowerCase();
 
         if (winnerTeam !== 'time1' && winnerTeam !== 'time2') {
             return message.channel.send('⚠️ Uso correto: `!vitoria time1` ou `!vitoria time2`');
         }
-        
+
         const match = message.client.activeMatches.get(message.guild.id);
         if (!match) {
             return message.channel.send('⚠️ Nenhuma partida ativa encontrada no servidor. Usem o `!sorteio` primeiro.');
@@ -22,7 +22,7 @@ module.exports = {
 
         try {
             // Removido o "await" porque o better-sqlite3 é síncrono
-            const db = getDB(); 
+            const db = getDB();
 
             for (const p of winnersData) {
                 // Utilizado .prepare().run()
@@ -31,7 +31,7 @@ module.exports = {
                      ON CONFLICT(discordId) DO UPDATE SET wins = wins + 1`
                 ).run(p.id);
             }
-            
+
             for (const p of losersData) {
                 // Utilizado .prepare().run()
                 db.prepare(
@@ -49,9 +49,9 @@ module.exports = {
                 );
             });
 
-            const mvpMsg = await message.channel.send({ 
-                content: `🏆 O **${winnerTeam.toUpperCase()}** levou a vitória e o resultado foi salvo! \n\n🌟 **VOTAÇÃO DE MVP:** Quem carregou a panela? Vocês têm 60 segundos para votar:`, 
-                components: [row] 
+            const mvpMsg = await message.channel.send({
+                content: `🏆 O **${winnerTeam.toUpperCase()}** levou a vitória e o resultado foi salvo! \n\n🌟 **VOTAÇÃO DE MVP:** Quem carregou a panela? Vocês têm 60 segundos para votar:`,
+                components: [row]
             });
 
             const filter = i => i.customId.startsWith('mvp_');
@@ -79,13 +79,20 @@ module.exports = {
                 let mvpName = winnersData.find(p => p.id === mvpId).name;
 
                 // Utilizado .prepare().run()
+                // ... código anterior onde o MVP ganha +1 no banco de dados ...
                 db.prepare(
                     `INSERT INTO players (discordId, wins, losses, mvps) VALUES (?, 0, 0, 1)
-                     ON CONFLICT(discordId) DO UPDATE SET mvps = mvps + 1`
+                    ON CONFLICT(discordId) DO UPDATE SET mvps = mvps + 1`
                 ).run(mvpId);
-                
+
+                // 🆕 ADICIONE ESTA LINHA AQUI: Registra a partida no histórico
+                db.prepare(`INSERT INTO match_history (winner_team, mvp_id) VALUES (?, ?)`).run(winnerTeam, mvpId);
+
                 await message.channel.send(`🌟 **O MVP da partida foi:** **${mvpName}** com ${votes[mvpId]} voto(s)! Mandem um \`!gg\` para voltar ao lobby.`);
-                
+                // ... resto do código ...
+
+                await message.channel.send(`🌟 **O MVP da partida foi:** **${mvpName}** com ${votes[mvpId]} voto(s)! Mandem um \`!gg\` para voltar ao lobby.`);
+
                 const disabledRow = new ActionRowBuilder();
                 winnersData.forEach(p => {
                     disabledRow.addComponents(
