@@ -6,19 +6,16 @@ module.exports = {
     description: 'Mostra os maiores paneleiros do servidor ou filtra por posição',
     
     async execute(message, args) {
-        // Pega a posição se foi passada como argumento (ex: PG, SG)
         const positionFilter = args[0]?.toUpperCase();
         const validPositions = ['PG', 'SG', 'SF', 'PF', 'C'];
 
         let loadingMessage;
-        // Se message.reply não existir no mockMessage, usamos send normal
-        if (message.channel) {
+        if (message.channel && !message.isInteractionMock) {
             loadingMessage = await message.channel.send('📊 Buscando dados na panela...');
         }
 
         try {
             const db = getDB(); 
-            // Pega todos os jogadores ordenados
             const allPlayers = db.prepare(`SELECT * FROM players ORDER BY wins DESC, mvps DESC`).all();
 
             if (allPlayers.length === 0) {
@@ -33,21 +30,23 @@ module.exports = {
             let rankingText = '';
             let count = 0;
 
+            // ⚡ A GRANDE CORREÇÃO ⚡
+            // Em vez de baixar o servidor inteiro (Opcode 8) ou usar loop, pedimos ao Discord 
+            // para trazer apenas os membros que estão na nossa tabela do banco de dados, tudo de uma vez.
+            const playersIds = allPlayers.map(p => p.discordId);
+            await message.guild.members.fetch({ user: playersIds }).catch(console.error);
+
             if (positionFilter && validPositions.includes(positionFilter)) {
                 embed.setTitle(`🏀 Top 10 - Posição: ${positionFilter}`);
                 embed.setDescription(`Os melhores **${positionFilter}** do servidor:`);
                 
-                // Busca todos os membros do servidor (cache) para ler os cargos
-                await message.guild.members.fetch(); 
-
                 for (const p of allPlayers) {
-                    if (count >= 10) break; // Só queremos o Top 10
+                    if (count >= 10) break;
                     
-                    // Busca o membro para checar os cargos
+                    // Como já fizemos o fetch ali em cima, isso agora puxa direto da memória (super rápido)
                     const member = message.guild.members.cache.get(p.discordId);
                     
                     if (member) {
-                        // Checa se ele tem o cargo da posição buscada
                         const hasRole = member.roles.cache.some(role => role.name.toUpperCase() === positionFilter);
                         if (hasRole) {
                             const totalGames = p.wins + p.losses;
@@ -60,14 +59,17 @@ module.exports = {
                     }
                 }
             } else {
-                // Comportamento original (Ranking Geral)
+                // Comportamento original (Ranking Geral) otimizado
                 embed.setTitle('🏀 Leaderboard Geral - REC do Panela Velha');
                 embed.setDescription('Os maiores paneleiros do servidor:');
                 
                 for (let i = 0; i < Math.min(allPlayers.length, 10); i++) {
                     const p = allPlayers[i];
-                    const user = await message.client.users.fetch(p.discordId).catch(() => null);
-                    const userName = user ? user.displayName : 'Jogador Desconhecido';
+                    
+                    // Pega da memória em vez de fazer client.users.fetch dentro do loop
+                    const member = message.guild.members.cache.get(p.discordId);
+                    const userName = member ? member.displayName : 'Jogador Desconhecido';
+                    
                     const totalGames = p.wins + p.losses;
                     const winRate = totalGames > 0 ? Math.round((p.wins / totalGames) * 100) : 0;
 
@@ -83,7 +85,6 @@ module.exports = {
 
             embed.addFields({ name: 'Top Jogadores', value: rankingText });
 
-            // Cria a fileira de botões de filtro de posição
             const rowFiltros = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId('btn_rank_geral').setLabel('GERAL').setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder().setCustomId('btn_rank_pg').setLabel('PG').setStyle(ButtonStyle.Primary),
@@ -92,14 +93,13 @@ module.exports = {
                 new ButtonBuilder().setCustomId('btn_rank_pf').setLabel('PF').setStyle(ButtonStyle.Primary)
             );
 
-            // Discord permite no máximo 5 botões por ActionRow. O 'C' precisa ir numa segunda linha, ou podemos usar botões suficientes.
             const rowFiltros2 = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId('btn_rank_c').setLabel('C').setStyle(ButtonStyle.Primary)
             );
 
-            if (loadingMessage) await loadingMessage.delete();
+            // Adicionado um .catch() para evitar erro caso a mensagem já tenha sido apagada
+            if (loadingMessage) await loadingMessage.delete().catch(() => null);
             
-            // Se foi um comando via botão que já editou a resposta, usamos reply
             if (message.isInteractionMock) {
                 await message.replyObj({ embeds: [embed], components: [rowFiltros, rowFiltros2] });
             } else {
@@ -108,7 +108,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Erro ao gerar ranking:', error);
-            if (loadingMessage) await loadingMessage.edit('❌ Erro ao buscar o ranking no banco de dados.');
+            if (loadingMessage) await loadingMessage.edit('❌ Erro ao buscar o ranking no banco de dados.').catch(() => null);
         }
     },
 };
