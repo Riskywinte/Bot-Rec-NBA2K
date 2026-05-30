@@ -12,6 +12,7 @@ module.exports = {
             return message.channel.send('⚠️ Uso correto: `!vitoria time1` ou `!vitoria time2`');
         }
 
+        // Puxa a partida da memória que foi criada pelo !sorteio
         const match = message.client.activeMatches.get(message.guild.id);
         if (!match) {
             return message.channel.send('⚠️ Nenhuma partida ativa encontrada no servidor. Usem o `!sorteio` primeiro.');
@@ -21,23 +22,26 @@ module.exports = {
         const losersData = winnerTeam === 'time1' ? match.team2Data : match.team1Data;
 
         try {
-            // Removido o "await" porque o better-sqlite3 é síncrono
             const db = getDB();
 
+            // ⚡ A SUA IDEIA AQUI ⚡
+            // Em vez de olhar o Discord, olhamos a posição que veio do sorteio!
+            // Assumimos que o sorteio salva a posição em "p.position".
+            
             for (const p of winnersData) {
-                // Utilizado .prepare().run()
+                const position = p.position ? p.position.toUpperCase() : 'UNKNOWN';
                 db.prepare(
-                    `INSERT INTO players (discordId, wins, losses, mvps) VALUES (?, 1, 0, 0)
-                     ON CONFLICT(discordId) DO UPDATE SET wins = wins + 1`
-                ).run(p.id);
+                    `INSERT INTO players (discordId, position, wins, losses, mvps) VALUES (?, ?, 1, 0, 0)
+                     ON CONFLICT(discordId, position) DO UPDATE SET wins = wins + 1`
+                ).run(p.id, position);
             }
 
             for (const p of losersData) {
-                // Utilizado .prepare().run()
+                const position = p.position ? p.position.toUpperCase() : 'UNKNOWN';
                 db.prepare(
-                    `INSERT INTO players (discordId, wins, losses, mvps) VALUES (?, 0, 1, 0)
-                     ON CONFLICT(discordId) DO UPDATE SET losses = losses + 1`
-                ).run(p.id);
+                    `INSERT INTO players (discordId, position, wins, losses, mvps) VALUES (?, ?, 0, 1, 0)
+                     ON CONFLICT(discordId, position) DO UPDATE SET losses = losses + 1`
+                ).run(p.id, position);
             }
 
             message.client.activeMatches.delete(message.guild.id);
@@ -76,20 +80,18 @@ module.exports = {
                 }
 
                 let mvpId = Object.keys(votes).reduce((a, b) => votes[a] > votes[b] ? a : b);
-                let mvpName = winnersData.find(p => p.id === mvpId).name;
+                
+                // Pegando os dados completos do MVP para pegar o nome e a posição dele no sorteio
+                let mvpPlayer = winnersData.find(p => p.id === mvpId);
+                let mvpName = mvpPlayer.name;
+                let mvpPosition = mvpPlayer.position ? mvpPlayer.position.toUpperCase() : 'UNKNOWN';
 
-                // Utilizado .prepare().run()
-                // ... código anterior onde o MVP ganha +1 no banco de dados ...
                 db.prepare(
-                    `INSERT INTO players (discordId, wins, losses, mvps) VALUES (?, 0, 0, 1)
-                    ON CONFLICT(discordId) DO UPDATE SET mvps = mvps + 1`
-                ).run(mvpId);
+                    `INSERT INTO players (discordId, position, wins, losses, mvps) VALUES (?, ?, 0, 0, 1)
+                    ON CONFLICT(discordId, position) DO UPDATE SET mvps = mvps + 1`
+                ).run(mvpId, mvpPosition);
 
-                // 🆕 ADICIONE ESTA LINHA AQUI: Registra a partida no histórico
                 db.prepare(`INSERT INTO match_history (winner_team, mvp_id) VALUES (?, ?)`).run(winnerTeam, mvpId);
-
-                await message.channel.send(`🌟 **O MVP da partida foi:** **${mvpName}** com ${votes[mvpId]} voto(s)! Mandem um \`!gg\` para voltar ao lobby.`);
-                // ... resto do código ...
 
                 await message.channel.send(`🌟 **O MVP da partida foi:** **${mvpName}** com ${votes[mvpId]} voto(s)! Mandem um \`!gg\` para voltar ao lobby.`);
 
@@ -99,11 +101,11 @@ module.exports = {
                         new ButtonBuilder().setCustomId(`ended_${p.id}`).setLabel(p.name).setStyle(ButtonStyle.Secondary).setDisabled(true)
                     );
                 });
-                await mvpMsg.edit({ components: [disabledRow] });
+                await mvpMsg.edit({ components: [disabledRow] }).catch(() => null);
             });
 
         } catch (error) {
-            console.error(error);
+            console.error('Erro ao registrar a partida:', error);
             await message.channel.send('❌ Houve um erro ao processar o resultado da partida.');
         }
     },

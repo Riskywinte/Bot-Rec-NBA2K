@@ -4,7 +4,7 @@ const { generateRosterImage } = require('../utils/canvasGen');
 module.exports = {
     name: 'sorteio',
     description: 'Sorteia os times automaticamente',
-    
+
     async execute(message, args) {
         const lobbyChannel = message.guild.channels.cache.find(
             channel => channel.name === 'LOBBY' && channel.type === ChannelType.GuildVoice
@@ -36,7 +36,7 @@ module.exports = {
             if (positionRoles.length > 0) {
                 players.push({
                     id: member.id,
-                    memberObj: member, 
+                    memberObj: member,
                     name: member.displayName,
                     positions: positionRoles
                 });
@@ -75,11 +75,11 @@ module.exports = {
 
         const positionsOrder = ['PG', 'SG', 'SF', 'PF', 'C'];
         const leftovers = [...unassignedPlayers];
-        
+
         leftovers.forEach(player => {
             const targetTeam = (team1.length <= team2.length && team1.length < teamSize) ? team1 : team2;
             let freePos = positionsOrder.find(pos => !targetTeam.some(p => p.assignedPosition === pos));
-            if (!freePos) freePos = player.positions[0]; 
+            if (!freePos) freePos = player.positions[0];
             assignPlayer(targetTeam, player, freePos);
         });
 
@@ -112,10 +112,10 @@ module.exports = {
             }
         }
 
-        // Salva a partida na memória para controle
+        // Salva a partida na memória para controle (AGORA COM A POSIÇÃO!)
         message.client.activeMatches.set(message.guild.id, {
-            team1Data: team1.map(p => ({ id: p.id, name: p.name })),
-            team2Data: team2.map(p => ({ id: p.id, name: p.name }))
+            team1Data: team1.map(p => ({ id: p.id, name: p.name, position: p.assignedPosition })),
+            team2Data: team2.map(p => ({ id: p.id, name: p.name, position: p.assignedPosition }))
         });
 
         // 🆕 Cria os botões para registrar a vitória
@@ -132,9 +132,9 @@ module.exports = {
                 .setStyle(ButtonStyle.Danger)
         );
 
-        await message.channel.send({ 
-            content: '✅ **Jogadores movidos! Bom jogo!**\n\n👇 *Quando a partida acabar, cliquem no botão abaixo para registrar o vencedor:*', 
-            components: [rowVitoria] 
+        await message.channel.send({
+            content: '✅ **Jogadores movidos! Bom jogo!**\n\n👇 *Quando a partida acabar, cliquem no botão abaixo para registrar o vencedor:*',
+            components: [rowVitoria]
         });
     },
 };
