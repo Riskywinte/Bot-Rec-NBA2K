@@ -59,20 +59,17 @@ client.on('interactionCreate', async interaction => {
     // Ignora os botões de MVP que já funcionam no vitoria.js
     if (interaction.customId.startsWith('mvp_') || interaction.customId.startsWith('ended_')) return;
 
-    // Objeto mockMessage atualizado para suportar as atualizações do Ranking
+    // Objeto mockMessage corrigido (sem a duplicata)
     const mockMessage = {
         client: interaction.client,
         guild: interaction.guild,
-        channel: interaction.channel,
+        channel: interaction.channel, // O channel nativo já possui a função .send()
         member: interaction.member,
         author: interaction.user,
         isInteractionMock: true,
         replyObj: (data) => interaction.editReply(data),
         mentions: { users: new Map() },
-        reply: (content) => interaction.reply({ content, ephemeral: true }),
-        channel: {
-            send: (content) => interaction.channel.send(content)
-        }
+        reply: (content) => interaction.reply({ content, ephemeral: true })
     };
 
     try {
