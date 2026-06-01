@@ -23,15 +23,10 @@ module.exports = {
         const teamSize = members.length / 2;
         const players = [];
 
-        members.forEach(member => {
-            const roles = member.roles.cache;
-            const positionRoles = [];
-
-            roles.forEach(role => {
-                if (['PG', 'SG', 'SF', 'PF', 'C'].includes(role.name.toUpperCase())) {
-                    positionRoles.push(role.name.toUpperCase());
-                }
-            });
+        for (const member of members) {
+            const positionRoles = member.roles.cache
+                .map(role => role.name.toUpperCase())
+                .filter(name => ['PG', 'SG', 'SF', 'PF', 'C'].includes(name));
 
             if (positionRoles.length > 0) {
                 players.push({
@@ -41,7 +36,7 @@ module.exports = {
                     positions: positionRoles
                 });
             }
-        });
+        }
 
         if (players.length !== members.length) {
             return message.channel.send('⚠️ **Aviso:** Nem todos os jogadores na call LOBBY possuem os cargos (PG, SG, SF, PF, C).');
@@ -71,15 +66,33 @@ module.exports = {
             }
         };
 
-        ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => tryAssignPosition(pos));
+        // Conta a quantidade de jogadores disponíveis para cada posição
+        const positionCounts = { PG: 0, SG: 0, SF: 0, PF: 0, C: 0 };
+        players.forEach(p => p.positions.forEach(pos => positionCounts[pos]++));
 
         const positionsOrder = ['PG', 'SG', 'SF', 'PF', 'C'];
+        shuffleArray(positionsOrder);
+        // Prioriza as posições que os jogadores no lobby mais jogam
+        positionsOrder.sort((a, b) => positionCounts[b] - positionCounts[a]);
+        
+        // Pega exatamente a quantidade de posições baseada no tamanho do time (ex: 4)
+        const matchPositions = positionsOrder.slice(0, teamSize);
+
+        matchPositions.forEach(pos => tryAssignPosition(pos));
+
         const leftovers = [...unassignedPlayers];
 
         leftovers.forEach(player => {
             const targetTeam = (team1.length <= team2.length && team1.length < teamSize) ? team1 : team2;
-            let freePos = player.positions.find(pos => !targetTeam.some(p => p.assignedPosition === pos));
+            
+            // Tenta encaixar o jogador em uma das posições espelhadas que ainda falta no time
+            let freePos = player.positions.find(pos => matchPositions.includes(pos) && !targetTeam.some(p => p.assignedPosition === pos));
+            // Se ele não tiver a role exata, aloca-o forçadamente na posição espelhada que sobrou
+            if (!freePos) {
+                freePos = matchPositions.find(pos => !targetTeam.some(p => p.assignedPosition === pos));
+            }
             if (!freePos) freePos = player.positions[0];
+            
             assignPlayer(targetTeam, player, freePos);
         });
 
@@ -97,18 +110,26 @@ module.exports = {
         const channelTeam2 = message.guild.channels.cache.find(c => c.name === 'TIME 2' && c.type === ChannelType.GuildVoice);
 
         if (channelTeam1 && channelTeam2) {
-            try {
-                for (const player of team1) {
-                    await player.memberObj.voice.setChannel(channelTeam1);
-                    await new Promise(resolve => setTimeout(resolve, 200));
+            let moveErrors = 0;
+            const movePlayer = async (player, channel) => {
+                try {
+                    await player.memberObj.voice.setChannel(channel);
+                    await new Promise(resolve => setTimeout(resolve, 200)); // Delay para evitar Rate Limit
+                } catch (error) {
+                    console.error(`Erro ao mover o jogador ${player.name}:`, error);
+                    moveErrors++;
                 }
-                for (const player of team2) {
-                    await player.memberObj.voice.setChannel(channelTeam2);
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                }
-            } catch (error) {
-                console.error(error);
-                await message.channel.send('❌ Ocorreu um erro ao tentar mover os jogadores.');
+            };
+
+            for (const player of team1) {
+                await movePlayer(player, channelTeam1);
+            }
+            for (const player of team2) {
+                await movePlayer(player, channelTeam2);
+            }
+
+            if (moveErrors > 0) {
+                await message.channel.send(`⚠️ **Aviso:** Não foi possível mover ${moveErrors} jogador(es). É provável que tenham saído da call de voz.`);
             }
         }
 
