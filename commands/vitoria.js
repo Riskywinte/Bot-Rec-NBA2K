@@ -12,7 +12,7 @@ module.exports = {
             return message.channel.send('⚠️ Uso correto: `!vitoria time1` ou `!vitoria time2`');
         }
 
-        // Puxa a partida da memória que foi criada pelo !sorteio
+        
         const match = message.client.activeMatches.get(message.guild.id);
         if (!match) {
             return message.channel.send('⚠️ Nenhuma partida ativa encontrada no servidor. Usem o `!sorteio` primeiro.');
@@ -23,10 +23,6 @@ module.exports = {
 
         try {
             const db = getDB();
-
-            // ⚡ A SUA IDEIA AQUI ⚡
-            // Em vez de olhar o Discord, olhamos a posição que veio do sorteio!
-            // Assumimos que o sorteio salva a posição em "p.position".
             
             for (const p of winnersData) {
                 const position = p.position ? p.position.toUpperCase() : 'UNKNOWN';
@@ -81,7 +77,7 @@ module.exports = {
 
                 let mvpId = Object.keys(votes).reduce((a, b) => votes[a] > votes[b] ? a : b);
                 
-                // Pegando os dados completos do MVP para pegar o nome e a posição dele no sorteio
+               
                 let mvpPlayer = winnersData.find(p => p.id === mvpId);
                 let mvpName = mvpPlayer.name;
                 let mvpPosition = mvpPlayer.position ? mvpPlayer.position.toUpperCase() : 'UNKNOWN';

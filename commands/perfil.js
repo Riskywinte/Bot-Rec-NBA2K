@@ -9,14 +9,12 @@ module.exports = {
         const targetUser = message.mentions.users.first() || message.author;
         const db = getDB();
 
-        // Fazemos a soma (SUM) de todas as posições em que esse jogador atuou
         const playerStats = db.prepare(`
             SELECT SUM(wins) as wins, SUM(losses) as losses, SUM(mvps) as mvps 
             FROM players 
             WHERE discordId = ?
         `).get(targetUser.id);
 
-        // Se wins for null, significa que ele não tem nenhuma linha na tabela
         if (!playerStats || playerStats.wins === null) {
             return message.reply(`⚠️ Não encontrei estatísticas para **${targetUser.displayName}**. Vá jogar uma partida primeiro!`);
         }

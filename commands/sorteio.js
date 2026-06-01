@@ -112,13 +112,11 @@ module.exports = {
             }
         }
 
-        // Salva a partida na memória para controle (AGORA COM A POSIÇÃO!)
         message.client.activeMatches.set(message.guild.id, {
             team1Data: team1.map(p => ({ id: p.id, name: p.name, position: p.assignedPosition })),
             team2Data: team2.map(p => ({ id: p.id, name: p.name, position: p.assignedPosition }))
         });
 
-        // 🆕 Cria os botões para registrar a vitória
         const rowVitoria = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setCustomId('btn_vitoria_time1')

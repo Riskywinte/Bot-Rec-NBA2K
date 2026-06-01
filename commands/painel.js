@@ -13,8 +13,7 @@ module.exports = {
             .setTitle('🏀 Painel de Controle - Panela Velha')
             .setColor('#e67e22')
             .setDescription('Use os botões abaixo para gerenciar as partidas do REC!')
-            .setImage('https://i.imgur.com/YOUR_IMAGE_URL_HERE.png') // Opcional: coloque um banner legal aqui
-            .setFooter({ text: 'Clique na ação desejada' });
+            .setImage('https://i.imgur.com/YOUR_IMAGE_URL_HERE.png')
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()

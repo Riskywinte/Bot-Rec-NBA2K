@@ -21,13 +21,11 @@ module.exports = {
             let rankingText = '';
             let count = 0;
 
-            // 1. LÓGICA DE FILTRO POR POSIÇÃO
             if (positionFilter && validPositions.includes(positionFilter)) {
                 embed.setColor('#3498db');
                 embed.setTitle(`🏀 Top 10 - Posição: ${positionFilter}`);
                 embed.setDescription(`Os melhores **${positionFilter}** do servidor:`);
                 
-                // Busca no banco APENAS as vitórias que o jogador teve NESSA posição
                 allPlayers = db.prepare(`SELECT * FROM players WHERE position = ? ORDER BY wins DESC, mvps DESC LIMIT 10`).all(positionFilter);
                 
                 if (allPlayers.length > 0) {
@@ -48,12 +46,10 @@ module.exports = {
                 }
 
             } else {
-                // 2. LÓGICA DO RANKING GERAL (Soma as posições de cada jogador)
                 embed.setColor('#f39c12');
                 embed.setTitle('🏀 Leaderboard Geral - REC do Panela Velha');
                 embed.setDescription('Os maiores paneleiros do servidor:');
                 
-                // Agrupa as linhas do mesmo jogador e soma vitórias, derrotas e mvps
                 allPlayers = db.prepare(`
                     SELECT discordId, SUM(wins) as wins, SUM(losses) as losses, SUM(mvps) as mvps 
                     FROM players 

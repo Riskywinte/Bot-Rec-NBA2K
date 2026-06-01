@@ -8,7 +8,6 @@ module.exports = {
     async execute(message, args) {
         const db = getDB();
         
-        // Pega as últimas 5 partidas ordenadas da mais recente para a mais antiga
         const matches = db.prepare('SELECT * FROM match_history ORDER BY id DESC LIMIT 5').all();
 
         if (matches.length === 0) {
@@ -21,13 +20,11 @@ module.exports = {
             .setDescription('Confira os resultados recentes:');
 
         for (const match of matches) {
-            // Busca o nome do MVP no Discord
             const mvpUser = await message.client.users.fetch(match.mvp_id).catch(() => null);
             const mvpName = mvpUser ? mvpUser.displayName : 'Jogador Desconhecido';
             
-            // Converte a data do banco (UTC) para o timestamp nativo do Discord (que se adapta ao fuso do usuário)
             const date = new Date(match.timestamp + 'Z'); 
-            const discordTime = `<t:${Math.floor(date.getTime() / 1000)}:R>`; // Mostra como "há X minutos/horas"
+            const discordTime = `<t:${Math.floor(date.getTime() / 1000)}:R>`;
 
             embed.addFields({
                 name: `Partida #${match.id} - ${discordTime}`,

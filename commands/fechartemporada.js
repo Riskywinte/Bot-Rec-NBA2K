@@ -16,7 +16,7 @@ module.exports = {
             const seasonRow = db.prepare("SELECT value FROM server_config WHERE key = 'current_season'").get();
             const currentSeason = seasonRow ? seasonRow.value : 1;
 
-            // Arrumado: Agora soma as posições para ver quem é o VERDADEIRO Top 3 geral da temporada
+            
             const topPlayers = db.prepare(`
                 SELECT discordId, SUM(wins) as wins, SUM(losses) as losses, SUM(mvps) as mvps 
                 FROM players 
@@ -30,14 +30,13 @@ module.exports = {
             }
 
             const fecharTemporadaTx = db.transaction(() => {
-                // Arrumado: Agora salva o ID, a Posição e a Temporada no arquivo morto
+                
                 const insertHistory = db.prepare(`
                     INSERT INTO past_seasons (discordId, position, season, wins, losses, mvps)
                     VALUES (@discordId, @position, @season, @wins, @losses, @mvps)
                     ON CONFLICT(discordId, position, season) DO REPLACE
                 `);
                 
-                // Pega as linhas exatas com as posições
                 const allPlayersLines = db.prepare('SELECT * FROM players').all();
                 for (const p of allPlayersLines) {
                     insertHistory.run({
@@ -50,7 +49,7 @@ module.exports = {
                     });
                 }
 
-                db.prepare('DELETE FROM players').run(); // DELETE é melhor que UPDATE para limpar as posições antigas completamente
+                db.prepare('DELETE FROM players').run();
 
                 db.prepare("UPDATE server_config SET value = value + 1 WHERE key = 'current_season'").run();
             });
