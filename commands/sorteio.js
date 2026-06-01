@@ -78,7 +78,7 @@ module.exports = {
 
         leftovers.forEach(player => {
             const targetTeam = (team1.length <= team2.length && team1.length < teamSize) ? team1 : team2;
-            let freePos = positionsOrder.find(pos => !targetTeam.some(p => p.assignedPosition === pos));
+            let freePos = player.positions.find(pos => !targetTeam.some(p => p.assignedPosition === pos));
             if (!freePos) freePos = player.positions[0];
             assignPlayer(targetTeam, player, freePos);
         });
