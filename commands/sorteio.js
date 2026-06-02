@@ -78,6 +78,9 @@ module.exports = {
         // Pega exatamente a quantidade de posições baseada no tamanho do time (ex: 4)
         const matchPositions = positionsOrder.slice(0, teamSize);
 
+        // Prioriza jogadores com menos opções de cargos (menos flexíveis) para que peguem suas roles primeiro
+        unassignedPlayers.sort((a, b) => a.positions.length - b.positions.length);
+
         matchPositions.forEach(pos => tryAssignPosition(pos));
 
         const leftovers = [...unassignedPlayers];
