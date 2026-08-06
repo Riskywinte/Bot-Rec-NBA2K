@@ -1,15 +1,11 @@
-const { EmbedBuilder, PermissionsBitField } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const { getDB } = require('../database');
 
 module.exports = {
     name: 'fechartemporada',
-    description: 'Encerra a temporada atual, salva os dados no Hall da Fama e reseta os status (Apenas Admins)',
+    description: 'Encerra a temporada atual, salva os dados no Hall da Fama e reseta os status',
     
     async execute(message, args) {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.channel.send('⚠️ **Acesso Negado:** Apenas administradores podem encerrar a temporada.');
-        }
-
         const db = getDB();
 
         try {
