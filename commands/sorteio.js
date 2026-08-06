@@ -85,17 +85,34 @@ module.exports = {
 
         const leftovers = [...unassignedPlayers];
 
+        const chooseBestTeam = (player) => {
+            const team1Open = player.positions.filter(pos => !team1.some(p => p.assignedPosition === pos));
+            const team2Open = player.positions.filter(pos => !team2.some(p => p.assignedPosition === pos));
+
+            const team1Match = team1Open.filter(pos => matchPositions.includes(pos));
+            const team2Match = team2Open.filter(pos => matchPositions.includes(pos));
+
+            if (team1Match.length > 0 && team2Match.length > 0) {
+                return team1.length <= team2.length ? team1 : team2;
+            }
+            if (team1Match.length > 0) return team1;
+            if (team2Match.length > 0) return team2;
+            if (team1Open.length > 0 && team2Open.length > 0) {
+                return team1.length <= team2.length ? team1 : team2;
+            }
+            if (team1Open.length > 0) return team1;
+            return team2;
+        };
+
         leftovers.forEach(player => {
-            const targetTeam = (team1.length <= team2.length && team1.length < teamSize) ? team1 : team2;
-            
-            // Tenta encaixar o jogador em uma das posições espelhadas que ainda falta no time
+            const targetTeam = chooseBestTeam(player);
+
             let freePos = player.positions.find(pos => matchPositions.includes(pos) && !targetTeam.some(p => p.assignedPosition === pos));
-            // Se ele não tiver a role exata, aloca-o forçadamente na posição espelhada que sobrou
             if (!freePos) {
-                freePos = matchPositions.find(pos => !targetTeam.some(p => p.assignedPosition === pos));
+                freePos = player.positions.find(pos => !targetTeam.some(p => p.assignedPosition === pos));
             }
             if (!freePos) freePos = player.positions[0];
-            
+
             assignPlayer(targetTeam, player, freePos);
         });
 

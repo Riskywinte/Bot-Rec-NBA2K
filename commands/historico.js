@@ -20,15 +20,17 @@ module.exports = {
             .setDescription('Confira os resultados recentes:');
 
         for (const match of matches) {
-            const mvpUser = await message.client.users.fetch(match.mvp_id).catch(() => null);
-            const mvpName = mvpUser ? mvpUser.displayName : 'Jogador Desconhecido';
-            
             const date = new Date(match.timestamp + 'Z'); 
             const discordTime = `<t:${Math.floor(date.getTime() / 1000)}:R>`;
 
+            const team1 = match.team1_members ? JSON.parse(match.team1_members) : [];
+            const team2 = match.team2_members ? JSON.parse(match.team2_members) : [];
+
+            const formatTeam = (team) => team.map(player => `• ${player.name} (${player.position})`).join('\n') || 'Nenhum jogador registrado.';
+
             embed.addFields({
                 name: `Partida #${match.id} - ${discordTime}`,
-                value: `🏆 Vencedor: **${match.winner_team.toUpperCase()}**\n🌟 MVP: **${mvpName}**`,
+                value: `🏆 Vencedor: **${match.winner_team.toUpperCase()}**\n\n**TIME 1**\n${formatTeam(team1)}\n\n**TIME 2**\n${formatTeam(team2)}`,
                 inline: false
             });
         }

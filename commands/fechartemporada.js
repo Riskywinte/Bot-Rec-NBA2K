@@ -18,10 +18,10 @@ module.exports = {
 
             
             const topPlayers = db.prepare(`
-                SELECT discordId, SUM(wins) as wins, SUM(losses) as losses, SUM(mvps) as mvps 
+                SELECT discordId, SUM(wins) as wins, SUM(losses) as losses
                 FROM players 
                 GROUP BY discordId
-                ORDER BY wins DESC, mvps DESC 
+                ORDER BY wins DESC
                 LIMIT 3
             `).all();
 
@@ -32,8 +32,8 @@ module.exports = {
             const fecharTemporadaTx = db.transaction(() => {
                 
                 const insertHistory = db.prepare(`
-                    INSERT INTO past_seasons (discordId, position, season, wins, losses, mvps)
-                    VALUES (@discordId, @position, @season, @wins, @losses, @mvps)
+                    INSERT INTO past_seasons (discordId, position, season, wins, losses)
+                    VALUES (@discordId, @position, @season, @wins, @losses)
                     ON CONFLICT(discordId, position, season) DO REPLACE
                 `);
                 
@@ -44,8 +44,7 @@ module.exports = {
                         position: p.position,
                         season: currentSeason,
                         wins: p.wins,
-                        losses: p.losses,
-                        mvps: p.mvps
+                        losses: p.losses
                     });
                 }
 
@@ -70,7 +69,7 @@ module.exports = {
                 const user = await message.client.users.fetch(p.discordId).catch(() => null);
                 const userName = user ? user.displayName : 'Jogador Desconhecido';
                 
-                podiumText += `${medalhas[i]} **${userName}**\n└ 🏆 ${p.wins} V | 💀 ${p.losses} D | 🌟 ${p.mvps} MVPs\n\n`;
+                podiumText += `${medalhas[i]} **${userName}**\n└ 🏆 ${p.wins} V | 💀 ${p.losses} D\n\n`;
             }
 
             embed.addFields({ name: '🌟 Pódio da Temporada (Hall da Fama)', value: podiumText });

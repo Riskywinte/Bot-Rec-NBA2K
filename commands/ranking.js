@@ -26,7 +26,7 @@ module.exports = {
                 embed.setTitle(`🏀 Top 10 - Posição: ${positionFilter}`);
                 embed.setDescription(`Os melhores **${positionFilter}** do servidor:`);
                 
-                allPlayers = db.prepare(`SELECT * FROM players WHERE position = ? ORDER BY wins DESC, mvps DESC LIMIT 10`).all(positionFilter);
+                allPlayers = db.prepare(`SELECT * FROM players WHERE position = ? ORDER BY wins DESC LIMIT 10`).all(positionFilter);
                 
                 if (allPlayers.length > 0) {
                     const playersIds = allPlayers.map(p => p.discordId);
@@ -40,7 +40,7 @@ module.exports = {
                         const winRate = totalGames > 0 ? Math.round((p.wins / totalGames) * 100) : 0;
                         
                         rankingText += `**${count + 1}º** ${userName}\n`;
-                        rankingText += `└ 🏆 ${p.wins} V | 💀 ${p.losses} D | 📊 ${winRate}% WR | 🌟 ${p.mvps} MVPs\n\n`;
+                        rankingText += `└ 🏆 ${p.wins} V | 💀 ${p.losses} D | 📊 ${winRate}% WR\n\n`;
                         count++;
                     }
                 }
@@ -51,10 +51,10 @@ module.exports = {
                 embed.setDescription('Os maiores paneleiros do servidor:');
                 
                 allPlayers = db.prepare(`
-                    SELECT discordId, SUM(wins) as wins, SUM(losses) as losses, SUM(mvps) as mvps 
+                    SELECT discordId, SUM(wins) as wins, SUM(losses) as losses 
                     FROM players 
                     GROUP BY discordId 
-                    ORDER BY wins DESC, mvps DESC 
+                    ORDER BY wins DESC 
                     LIMIT 10
                 `).all();
 
@@ -70,7 +70,7 @@ module.exports = {
                         const winRate = totalGames > 0 ? Math.round((p.wins / totalGames) * 100) : 0;
 
                         rankingText += `**${count + 1}º** ${userName}\n`;
-                        rankingText += `└ 🏆 ${p.wins} V | 💀 ${p.losses} D | 📊 ${winRate}% WR | 🌟 ${p.mvps} MVPs\n\n`;
+                        rankingText += `└ 🏆 ${p.wins} V | 💀 ${p.losses} D | 📊 ${winRate}% WR\n\n`;
                         count++;
                     }
                 }

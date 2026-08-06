@@ -9,6 +9,10 @@ module.exports = {
         const channelTeam1 = message.guild.channels.cache.find(c => c.name === 'TIME 1' && c.type === ChannelType.GuildVoice);
         const channelTeam2 = message.guild.channels.cache.find(c => c.name === 'TIME 2' && c.type === ChannelType.GuildVoice);
 
+        if (message.client.activeMatches.has(message.guild.id)) {
+            return message.channel.send('⚠️ **A partida ainda não teve vencedor declarado.** Declare um Vencedor antes de `!gg` ou `!fim`.');
+        }
+
         if (!lobbyChannel || !channelTeam1 || !channelTeam2) {
             return message.channel.send('⚠️ **Erro:** Não encontrei os canais de voz necessários (LOBBY, TIME 1 ou TIME 2).');
         }

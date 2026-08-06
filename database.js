@@ -7,7 +7,6 @@ db.exec(`
         position TEXT,
         wins INTEGER DEFAULT 0,
         losses INTEGER DEFAULT 0,
-        mvps INTEGER DEFAULT 0,
         PRIMARY KEY (discordId, position)
     );
 
@@ -15,7 +14,8 @@ db.exec(`
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
         winner_team TEXT,
-        mvp_id TEXT
+        team1_members TEXT,
+        team2_members TEXT
     );
 
     CREATE TABLE IF NOT EXISTS server_config (
@@ -32,10 +32,17 @@ db.exec(`
         season INTEGER,
         wins INTEGER,
         losses INTEGER,
-        mvps INTEGER,
         PRIMARY KEY (discordId, position, season)
     );
 `);
+
+const matchHistoryColumns = db.prepare('PRAGMA table_info(match_history)').all().map(col => col.name);
+if (!matchHistoryColumns.includes('team1_members')) {
+    db.prepare('ALTER TABLE match_history ADD COLUMN team1_members TEXT').run();
+}
+if (!matchHistoryColumns.includes('team2_members')) {
+    db.prepare('ALTER TABLE match_history ADD COLUMN team2_members TEXT').run();
+}
 
 function getDB() {
     return db;

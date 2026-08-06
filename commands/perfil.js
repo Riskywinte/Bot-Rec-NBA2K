@@ -10,7 +10,7 @@ module.exports = {
         const db = getDB();
 
         const playerStats = db.prepare(`
-            SELECT SUM(wins) as wins, SUM(losses) as losses, SUM(mvps) as mvps 
+            SELECT SUM(wins) as wins, SUM(losses) as losses 
             FROM players 
             WHERE discordId = ?
         `).get(targetUser.id);
@@ -29,7 +29,6 @@ module.exports = {
             .addFields(
                 { name: 'Partidas Jogadas', value: `\`${totalGames}\``, inline: true },
                 { name: 'Win Rate (WR)', value: `\`${winRate}%\``, inline: true },
-                { name: 'MVPs 🌟', value: `\`${playerStats.mvps}\``, inline: true },
                 { name: 'Vitórias (V) 🏆', value: `\`${playerStats.wins}\``, inline: true },
                 { name: 'Derrotas (D) 💀', value: `\`${playerStats.losses}\``, inline: true }
             )

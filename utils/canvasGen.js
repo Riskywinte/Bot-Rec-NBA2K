@@ -10,7 +10,7 @@ async function generateRosterImage(team1, team2) {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 40px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('REC do Panela Velha', canvas.width / 2, 60);
+    ctx.fillText('Only REC', canvas.width / 2, 60);
 
     ctx.font = 'bold 30px Arial';
     ctx.fillStyle = '#3498db'; 

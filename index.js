@@ -57,9 +57,6 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
 
 
-    if (interaction.customId.startsWith('mvp_') || interaction.customId.startsWith('ended_')) return;
-
-
     const mockMessage = {
         client: interaction.client,
         guild: interaction.guild,
