@@ -30,7 +30,9 @@ module.exports = {
                 const insertHistory = db.prepare(`
                     INSERT INTO past_seasons (discordId, position, season, wins, losses)
                     VALUES (@discordId, @position, @season, @wins, @losses)
-                    ON CONFLICT(discordId, position, season) DO REPLACE
+                    ON CONFLICT(discordId, position, season) DO UPDATE SET
+                        wins = excluded.wins,
+                        losses = excluded.losses
                 `);
                 
                 const allPlayersLines = db.prepare('SELECT * FROM players').all();

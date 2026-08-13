@@ -6,7 +6,10 @@ module.exports = {
     description: 'Mostra o Player Card e as estatísticas de um jogador',
     
     async execute(message, args) {
-        const targetUser = message.mentions.users.first() || message.author;
+        const mentionedUser = message.mentions && typeof message.mentions.users?.first === 'function'
+            ? message.mentions.users.first()
+            : null;
+        const targetUser = mentionedUser || message.author;
         const db = getDB();
 
         const playerStats = db.prepare(`
