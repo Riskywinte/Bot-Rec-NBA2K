@@ -26,7 +26,11 @@ module.exports = {
             const team1 = match.team1_members ? JSON.parse(match.team1_members) : [];
             const team2 = match.team2_members ? JSON.parse(match.team2_members) : [];
 
-            const formatTeam = (team) => team.map(player => `• ${player.name} (${player.position})`).join('\n') || 'Nenhum jogador registrado.';
+            const positionOrder = { PG: 0, SG: 1, SF: 2, PF: 3, C: 4 };
+            const formatTeam = (team) => [...team]
+                .sort((a, b) => (positionOrder[a.position] ?? 99) - (positionOrder[b.position] ?? 99))
+                .map(player => `• ${player.name} (${player.position})`)
+                .join('\n') || 'Nenhum jogador registrado.';
 
             embed.addFields({
                 name: `Partida #${match.id} - ${discordTime}`,
