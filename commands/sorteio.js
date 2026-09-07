@@ -46,75 +46,48 @@ module.exports = {
 
         shuffleArray(players);
 
-        const team1 = [];
-        const team2 = [];
-        let unassignedPlayers = [...players];
+        const assignPositions = teamPlayers => {
+            const orderedPlayers = [...teamPlayers]
+                .sort((a, b) => a.positions.length - b.positions.length)
+            const findUniqueAssignment = (index, usedPositions, assignments) => {
+                if (index === orderedPlayers.length) return assignments;
 
-        const assignPlayer = (team, player, position) => {
-            team.push({ ...player, assignedPosition: position });
-            unassignedPlayers = unassignedPlayers.filter(p => p.id !== player.id);
+                const player = orderedPlayers[index];
+                for (const position of player.positions) {
+                    if (usedPositions.has(position)) continue;
+
+                    const nextAssignments = findUniqueAssignment(
+                        index + 1,
+                        new Set([...usedPositions, position]),
+                        [...assignments, position]
+                    );
+                    if (nextAssignments) return nextAssignments;
+                }
+
+                return null;
+            };
+
+            const uniqueAssignments = findUniqueAssignment(0, new Set(), []);
+            const fallbackAssignments = [];
+            const usedFallbackPositions = new Set();
+
+            orderedPlayers.forEach(player => {
+                const position = player.positions.find(pos => !usedFallbackPositions.has(pos)) || player.positions[0];
+                fallbackAssignments.push(position);
+                usedFallbackPositions.add(position);
+            });
+
+            const assignments = uniqueAssignments || fallbackAssignments;
+
+            return orderedPlayers.map((player, index) => ({
+                ...player,
+                assignedPosition: assignments[index]
+            }));
         };
 
-        const tryAssignPosition = (pos) => {
-            if (team1.length < teamSize && !team1.some(p => p.assignedPosition === pos)) {
-                const playerA = unassignedPlayers.find(p => p.positions.includes(pos));
-                if (playerA) assignPlayer(team1, playerA, pos);
-            }
-            if (team2.length < teamSize && !team2.some(p => p.assignedPosition === pos)) {
-                const playerB = unassignedPlayers.find(p => p.positions.includes(pos));
-                if (playerB) assignPlayer(team2, playerB, pos);
-            }
-        };
-
-        // Conta a quantidade de jogadores disponíveis para cada posição
-        const positionCounts = { PG: 0, SG: 0, SF: 0, PF: 0, C: 0 };
-        players.forEach(p => p.positions.forEach(pos => positionCounts[pos]++));
-
-        const positionsOrder = ['PG', 'SG', 'SF', 'PF', 'C'];
-        shuffleArray(positionsOrder);
-        // Prioriza as posições que os jogadores no lobby mais jogam
-        positionsOrder.sort((a, b) => positionCounts[b] - positionCounts[a]);
-        
-        // Pega exatamente a quantidade de posições baseada no tamanho do time (ex: 4)
-        const matchPositions = positionsOrder.slice(0, teamSize);
-
-        // Prioriza jogadores com menos opções de cargos (menos flexíveis) para que peguem suas roles primeiro
-        unassignedPlayers.sort((a, b) => a.positions.length - b.positions.length);
-
-        matchPositions.forEach(pos => tryAssignPosition(pos));
-
-        const leftovers = [...unassignedPlayers];
-
-        const chooseBestTeam = (player) => {
-            const team1Open = player.positions.filter(pos => !team1.some(p => p.assignedPosition === pos));
-            const team2Open = player.positions.filter(pos => !team2.some(p => p.assignedPosition === pos));
-
-            const team1Match = team1Open.filter(pos => matchPositions.includes(pos));
-            const team2Match = team2Open.filter(pos => matchPositions.includes(pos));
-
-            if (team1Match.length > 0 && team2Match.length > 0) {
-                return team1.length <= team2.length ? team1 : team2;
-            }
-            if (team1Match.length > 0) return team1;
-            if (team2Match.length > 0) return team2;
-            if (team1Open.length > 0 && team2Open.length > 0) {
-                return team1.length <= team2.length ? team1 : team2;
-            }
-            if (team1Open.length > 0) return team1;
-            return team2;
-        };
-
-        leftovers.forEach(player => {
-            const targetTeam = chooseBestTeam(player);
-
-            let freePos = player.positions.find(pos => matchPositions.includes(pos) && !targetTeam.some(p => p.assignedPosition === pos));
-            if (!freePos) {
-                freePos = player.positions.find(pos => !targetTeam.some(p => p.assignedPosition === pos));
-            }
-            if (!freePos) freePos = player.positions[0];
-
-            assignPlayer(targetTeam, player, freePos);
-        });
+        const balancedTeams = chooseBalancedTeams(players, teamSize);
+        const team1 = assignPositions(balancedTeams.team1);
+        const team2 = assignPositions(balancedTeams.team2);
 
         try {
             const imageBuffer = await generateRosterImage(team1, team2);
@@ -183,4 +156,48 @@ function shuffleArray(array) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
+}
+
+function chooseBalancedTeams(players, teamSize) {
+    const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+    let bestTeam1 = players.slice(0, teamSize);
+    let bestScore = Infinity;
+
+    const evaluateTeam = team => positions.map(position =>
+        team.filter(player => player.positions.includes(position)).length
+    );
+
+    const search = (start, selected) => {
+        if (selected.length === teamSize) {
+            const team1 = selected.map(index => players[index]);
+            const selectedIds = new Set(selected);
+            const team2 = players.filter((_, index) => !selectedIds.has(index));
+            const team1Profile = evaluateTeam(team1);
+            const team2Profile = evaluateTeam(team2);
+            const score = team1Profile.reduce((total, count, index) =>
+                total + Math.abs(count - team2Profile[index]), 0
+            );
+
+            if (score < bestScore) {
+                bestScore = score;
+                bestTeam1 = team1;
+            }
+            return;
+        }
+
+        const remaining = teamSize - selected.length;
+        for (let index = start; index <= players.length - remaining; index++) {
+            selected.push(index);
+            search(index + 1, selected);
+            selected.pop();
+        }
+    };
+
+    search(0, []);
+
+    const team1Ids = new Set(bestTeam1);
+    return {
+        team1: bestTeam1,
+        team2: players.filter(player => !team1Ids.has(player))
+    };
 }
