@@ -16,8 +16,8 @@ module.exports = {
 
         let members = Array.from(lobbyChannel.members.values());
 
-        if (members.length === 0 || members.length % 2 !== 0) {
-            return message.channel.send('O sorteio requer um número PAR de jogadores no canal "LOBBY" (ex: 2, 4, 6, 8, 10...).');
+        if (members.length !== 8 && members.length !== 10) {
+            return message.channel.send('O sorteio requer 8 jogadores para REC com 2 bots ou 10 jogadores para REC completo.');
         }
 
         const teamSize = members.length / 2;
@@ -25,7 +25,7 @@ module.exports = {
 
         for (const member of members) {
             const positionRoles = member.roles.cache
-                .map(role => role.name.toUpperCase())
+                .map(role => role.name.trim().toUpperCase())
                 .filter(name => ['PG', 'SG', 'SF', 'PF', 'C'].includes(name));
 
             if (positionRoles.length > 0) {
@@ -46,48 +46,24 @@ module.exports = {
 
         shuffleArray(players);
 
-        const assignPositions = teamPlayers => {
-            const orderedPlayers = [...teamPlayers]
-                .sort((a, b) => a.positions.length - b.positions.length)
-            const findUniqueAssignment = (index, usedPositions, assignments) => {
-                if (index === orderedPlayers.length) return assignments;
+        const assignPositions = (teamPlayers, missingPosition) => {
+            const uniqueAssignments = findPositionAssignment(teamPlayers, missingPosition);
+            if (!uniqueAssignments) return null;
 
-                const player = orderedPlayers[index];
-                for (const position of player.positions) {
-                    if (usedPositions.has(position)) continue;
-
-                    const nextAssignments = findUniqueAssignment(
-                        index + 1,
-                        new Set([...usedPositions, position]),
-                        [...assignments, position]
-                    );
-                    if (nextAssignments) return nextAssignments;
-                }
-
-                return null;
-            };
-
-            const uniqueAssignments = findUniqueAssignment(0, new Set(), []);
-            const fallbackAssignments = [];
-            const usedFallbackPositions = new Set();
-
-            orderedPlayers.forEach(player => {
-                const position = player.positions.find(pos => !usedFallbackPositions.has(pos)) || player.positions[0];
-                fallbackAssignments.push(position);
-                usedFallbackPositions.add(position);
-            });
-
-            const assignments = uniqueAssignments || fallbackAssignments;
-
-            return orderedPlayers.map((player, index) => ({
+            return uniqueAssignments.players.map((player, index) => ({
                 ...player,
-                assignedPosition: assignments[index]
+                assignedPosition: uniqueAssignments.positions[index]
             }));
         };
 
         const balancedTeams = chooseBalancedTeams(players, teamSize);
-        const team1 = assignPositions(balancedTeams.team1);
-        const team2 = assignPositions(balancedTeams.team2);
+        if (!balancedTeams) {
+            await loadingMessage.edit('❌ Não foi possível montar dois times sem repetir posições. É necessário ter jogadores suficientes para preencher PG, SG, SF, PF e C em cada time.');
+            return;
+        }
+
+        const team1 = assignPositions(balancedTeams.team1, balancedTeams.missingPosition);
+        const team2 = assignPositions(balancedTeams.team2, balancedTeams.missingPosition);
 
         try {
             const imageBuffer = await generateRosterImage(team1, team2);
@@ -158,9 +134,38 @@ function shuffleArray(array) {
     }
 }
 
+function findPositionAssignment(team, missingPosition = null) {
+    const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+    const players = [...team].sort((a, b) => a.positions.length - b.positions.length);
+
+    const search = (index, usedPositions, assignments) => {
+        if (index === players.length) return assignments;
+
+        const player = players[index];
+        for (const position of player.positions) {
+            if (position === missingPosition || usedPositions.has(position)) continue;
+
+            const result = search(
+                index + 1,
+                new Set([...usedPositions, position]),
+                [...assignments, position]
+            );
+            if (result) return result;
+        }
+
+        return null;
+    };
+
+    const assignedPositions = search(0, new Set(), []);
+    if (!assignedPositions) return null;
+
+    return { players, positions: assignedPositions };
+}
+
 function chooseBalancedTeams(players, teamSize) {
     const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
     let bestTeam1 = players.slice(0, teamSize);
+    let bestMissingPosition = null;
     let bestScore = Infinity;
 
     const evaluateTeam = team => positions.map(position =>
@@ -172,15 +177,32 @@ function chooseBalancedTeams(players, teamSize) {
             const team1 = selected.map(index => players[index]);
             const selectedIds = new Set(selected);
             const team2 = players.filter((_, index) => !selectedIds.has(index));
-            const team1Profile = evaluateTeam(team1);
-            const team2Profile = evaluateTeam(team2);
-            const score = team1Profile.reduce((total, count, index) =>
-                total + Math.abs(count - team2Profile[index]), 0
+            const team1MissingPositions = positions.filter(position =>
+                !team1.some(player => player.positions.includes(position))
             );
+            const team2MissingPositions = positions.filter(position =>
+                !team2.some(player => player.positions.includes(position))
+            );
+            const possibleMissingPositions = teamSize === 4
+                ? team1MissingPositions.filter(position => team2MissingPositions.includes(position))
+                : [null];
 
-            if (score < bestScore) {
-                bestScore = score;
-                bestTeam1 = team1;
+            for (const missingPosition of possibleMissingPositions) {
+                const team1Assignment = findPositionAssignment(team1, missingPosition);
+                const team2Assignment = findPositionAssignment(team2, missingPosition);
+                if (!team1Assignment || !team2Assignment) continue;
+
+                const team1Profile = evaluateTeam(team1);
+                const team2Profile = evaluateTeam(team2);
+                const positionDifference = team1Profile.reduce((total, count, index) =>
+                    total + Math.abs(count - team2Profile[index]), 0
+                );
+
+                if (positionDifference < bestScore) {
+                    bestScore = positionDifference;
+                    bestTeam1 = team1;
+                    bestMissingPosition = missingPosition;
+                }
             }
             return;
         }
@@ -195,9 +217,12 @@ function chooseBalancedTeams(players, teamSize) {
 
     search(0, []);
 
+    if (bestScore === Infinity) return null;
+
     const team1Ids = new Set(bestTeam1);
     return {
         team1: bestTeam1,
-        team2: players.filter(player => !team1Ids.has(player))
+        team2: players.filter(player => !team1Ids.has(player)),
+        missingPosition: bestMissingPosition
     };
 }

@@ -77,8 +77,8 @@ async function generateRosterImage(team1, team2) {
 
     for (let i = 0; i < positionsOrder.length; i++) {
         const pos = positionsOrder[i];
-        const playerA = team1.find(p => p.assignedPosition === pos);
-        const playerB = team2.find(p => p.assignedPosition === pos);
+        const playerA = team1.find(player => player.assignedPosition === pos);
+        const playerB = team2.find(player => player.assignedPosition === pos);
         
         const currentY = startY + (i * (slotHeight + gap));
 
