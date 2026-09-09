@@ -58,7 +58,13 @@ module.exports = {
 
         const balancedTeams = chooseBalancedTeams(players, teamSize);
         if (!balancedTeams) {
-            await loadingMessage.edit('❌ Não foi possível montar dois times sem repetir posições. É necessário ter jogadores suficientes para preencher PG, SG, SF, PF e C em cada time.');
+            const missingPositions = getMissingPositions(players);
+            const missingText = missingPositions.length
+                ? `
+Falta(m) a(s) posição(ões): ${missingPositions.join(', ')}.`
+                : '';
+
+            await loadingMessage.edit(`❌ Não foi possível montar dois times sem repetir posições. É necessário ter jogadores suficientes para preencher PG, SG, SF, PF e C em cada time.${missingText}`);
             return;
         }
 
@@ -132,6 +138,19 @@ function shuffleArray(array) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
+}
+
+function getMissingPositions(players) {
+    const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+    const presentPositions = new Set();
+
+    for (const player of players) {
+        for (const position of player.positions) {
+            presentPositions.add(position);
+        }
+    }
+
+    return positions.filter(position => !presentPositions.has(position));
 }
 
 function findPositionAssignment(team, missingPosition = null) {
