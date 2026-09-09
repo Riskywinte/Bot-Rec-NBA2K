@@ -58,11 +58,14 @@ module.exports = {
 
         const balancedTeams = chooseBalancedTeams(players, teamSize);
         if (!balancedTeams) {
-            const missingPositions = getMissingPositions(players, teamSize);
-            const missingText = missingPositions.length
+            const missingInfo = getMissingPositions(players, teamSize);
+            const missingText = missingInfo.missingPositions.length
                 ? `
-Falta(m) a(s) posição(ões): ${missingPositions.join(', ')}.`
-                : '';
+Falta(m) a(s) posição(ões): ${missingInfo.missingPositions.join(', ')}.`
+                : missingInfo.scarcityText
+                    ? `
+${missingInfo.scarcityText}`
+                    : '';
 
             await loadingMessage.edit(`❌ Não foi possível montar dois times sem repetir posições. É necessário ter jogadores suficientes para preencher PG, SG, SF, PF e C em cada time.${missingText}`);
             return;
@@ -150,7 +153,22 @@ function getMissingPositions(players, teamSize) {
         }
     }
 
-    return positions.filter(position => counts[position] < 2);
+    const missingPositions = positions.filter(position => counts[position] < 2);
+
+    if (missingPositions.length > 0) {
+        return {
+            missingPositions,
+            scarcityText: null
+        };
+    }
+
+    const lowestCount = Math.min(...positions.map(position => counts[position]));
+    const scarcePositions = positions.filter(position => counts[position] === lowestCount);
+
+    return {
+        missingPositions: [],
+        scarcityText: `As posições mais escassas são: ${scarcePositions.join(', ')} (${lowestCount} jogador(es) cada).`
+    };
 }
 
 function findPositionAssignment(team, missingPosition = null) {
