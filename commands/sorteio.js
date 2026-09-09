@@ -58,7 +58,7 @@ module.exports = {
 
         const balancedTeams = chooseBalancedTeams(players, teamSize);
         if (!balancedTeams) {
-            const missingPositions = getMissingPositions(players);
+            const missingPositions = getMissingPositions(players, teamSize);
             const missingText = missingPositions.length
                 ? `
 Falta(m) a(s) posição(ões): ${missingPositions.join(', ')}.`
@@ -140,17 +140,17 @@ function shuffleArray(array) {
     }
 }
 
-function getMissingPositions(players) {
+function getMissingPositions(players, teamSize) {
     const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
-    const presentPositions = new Set();
+    const counts = Object.fromEntries(positions.map(position => [position, 0]));
 
     for (const player of players) {
         for (const position of player.positions) {
-            presentPositions.add(position);
+            counts[position] += 1;
         }
     }
 
-    return positions.filter(position => !presentPositions.has(position));
+    return positions.filter(position => counts[position] < 2);
 }
 
 function findPositionAssignment(team, missingPosition = null) {
