@@ -47,18 +47,19 @@ module.exports = {
         shuffleArray(players);
 
         const assignPositions = (teamPlayers, missingPosition) => {
-            const uniqueAssignments = findPositionAssignment(teamPlayers, missingPosition);
-            if (!uniqueAssignments) return null;
+            const ignorePositionRules = teamSize === 4;
+            const assignments = findPositionAssignment(teamPlayers, missingPosition, ignorePositionRules);
+            if (!assignments) return null;
 
-            return uniqueAssignments.players.map((player, index) => ({
+            return assignments.players.map((player, index) => ({
                 ...player,
-                assignedPosition: uniqueAssignments.positions[index]
+                assignedPosition: assignments.positions[index]
             }));
         };
 
         const balancedTeams = chooseBalancedTeams(players, teamSize);
         if (!balancedTeams) {
-            const missingInfo = getMissingPositions(players, teamSize);
+            const missingInfo = getMissingPositions(players);
             const missingText = missingInfo.missingPositions.length
                 ? `
 Falta(m) a(s) posição(ões): ${missingInfo.missingPositions.join(', ')}.`
@@ -143,7 +144,7 @@ function shuffleArray(array) {
     }
 }
 
-function getMissingPositions(players, teamSize) {
+function getMissingPositions(players) {
     const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
     const counts = Object.fromEntries(positions.map(position => [position, 0]));
 
@@ -167,11 +168,11 @@ function getMissingPositions(players, teamSize) {
 
     return {
         missingPositions: [],
-        scarcityText: `As posições mais escassas são: ${scarcePositions.join(', ')} (${lowestCount} jogador(es) cada).`
+        scarcityText: `Nenhuma posição está diretamente faltando. As mais escassas são: ${scarcePositions.join(', ')} (${lowestCount} jogador(es) com esse cargo cada). A falha ocorreu na combinação dos cargos entre os times.`
     };
 }
 
-function findPositionAssignment(team, missingPosition = null) {
+function findPositionAssignment(team, missingPosition = null, ignorePositionRules = false) {
     const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
     const players = [...team].sort((a, b) => a.positions.length - b.positions.length);
 
@@ -179,8 +180,9 @@ function findPositionAssignment(team, missingPosition = null) {
         if (index === players.length) return assignments;
 
         const player = players[index];
-        for (const position of player.positions) {
-            if (position === missingPosition || usedPositions.has(position)) continue;
+        const availablePositions = ignorePositionRules ? positions : player.positions;
+        for (const position of availablePositions) {
+            if (position === missingPosition || (!ignorePositionRules && usedPositions.has(position))) continue;
 
             const result = search(
                 index + 1,
@@ -214,19 +216,12 @@ function chooseBalancedTeams(players, teamSize) {
             const team1 = selected.map(index => players[index]);
             const selectedIds = new Set(selected);
             const team2 = players.filter((_, index) => !selectedIds.has(index));
-            const team1MissingPositions = positions.filter(position =>
-                !team1.some(player => player.positions.includes(position))
-            );
-            const team2MissingPositions = positions.filter(position =>
-                !team2.some(player => player.positions.includes(position))
-            );
-            const possibleMissingPositions = teamSize === 4
-                ? team1MissingPositions.filter(position => team2MissingPositions.includes(position))
-                : [null];
+            const possibleMissingPositions = teamSize === 4 ? positions : [null];
 
             for (const missingPosition of possibleMissingPositions) {
-                const team1Assignment = findPositionAssignment(team1, missingPosition);
-                const team2Assignment = findPositionAssignment(team2, missingPosition);
+                const ignorePositionRules = teamSize === 4;
+                const team1Assignment = findPositionAssignment(team1, missingPosition, ignorePositionRules);
+                const team2Assignment = findPositionAssignment(team2, missingPosition, ignorePositionRules);
                 if (!team1Assignment || !team2Assignment) continue;
 
                 const team1Profile = evaluateTeam(team1);
