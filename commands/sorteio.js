@@ -47,8 +47,7 @@ module.exports = {
         shuffleArray(players);
 
         const assignPositions = (teamPlayers, missingPosition) => {
-            const ignorePositionRules = teamSize === 4;
-            const assignments = findPositionAssignment(teamPlayers, missingPosition, ignorePositionRules);
+            const assignments = findPositionAssignment(teamPlayers, missingPosition, false);
             if (!assignments) return null;
 
             return assignments.players.map((player, index) => ({
@@ -219,9 +218,8 @@ function chooseBalancedTeams(players, teamSize) {
             const possibleMissingPositions = teamSize === 4 ? positions : [null];
 
             for (const missingPosition of possibleMissingPositions) {
-                const ignorePositionRules = teamSize === 4;
-                const team1Assignment = findPositionAssignment(team1, missingPosition, ignorePositionRules);
-                const team2Assignment = findPositionAssignment(team2, missingPosition, ignorePositionRules);
+                const team1Assignment = findPositionAssignment(team1, missingPosition, false);
+                const team2Assignment = findPositionAssignment(team2, missingPosition, false);
                 if (!team1Assignment || !team2Assignment) continue;
 
                 const team1Profile = evaluateTeam(team1);

@@ -84,6 +84,17 @@ const result4x4 = chooseBalancedTeams(players4x4, 4);
 if (!result4x4) throw new Error('O sorteio 4x4 não encontrou uma divisão válida.');
 if (result4x4.missingPosition === null) throw new Error('O sorteio 4x4 não definiu uma posição vazia.');
 
+const assertUniquePositions = (team, label) => {
+  const positions = team.map(player => player.positions[0]);
+  const duplicates = positions.filter((position, index) => positions.indexOf(position) !== index);
+  if (duplicates.length > 0) {
+    throw new Error(`${label} gerou posições duplicadas: ${duplicates.join(', ')}`);
+  }
+};
+
+assertUniquePositions(result4x4.team1, 'TIME 1');
+assertUniquePositions(result4x4.team2, 'TIME 2');
+
 console.log('4x4:', JSON.stringify(result4x4, null, 2));
 
 const players5x5 = [
