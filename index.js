@@ -97,6 +97,15 @@ client.on('interactionCreate', async interaction => {
             const cmd = client.commands.get('ranking');
             await cmd.execute(mockMessage, args);
         }
+        else if (interaction.customId.startsWith('btn_partidas_')) {
+            await interaction.deferUpdate();
+
+            const [, direction, currentPage] = interaction.customId.split('_');
+            const nextPage = Number.parseInt(currentPage, 10) + (direction === 'next' ? 1 : -1);
+
+            const cmd = client.commands.get('partidas');
+            await cmd.execute(mockMessage, [String(nextPage)]);
+        }
 
 
         else if (interaction.customId === 'btn_vitoria_time1' || interaction.customId === 'btn_vitoria_time2') {
