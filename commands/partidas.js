@@ -1,8 +1,16 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getDB } = require('../database');
 
-const ONLY_REC_ROLE_NAME = '(only rec)';
+const ONLY_REC_ROLE_NAME = 'only rec';
 const PLAYERS_PER_PAGE = 10;
+
+const normalizeRoleName = name => name
+    .trim()
+    .toLowerCase()
+    .replace(/[()]/g, '')
+    .replace(/\s+/g, ' ');
+
+const isOnlyRecRole = role => normalizeRoleName(role.name) === ONLY_REC_ROLE_NAME;
 
 module.exports = {
     name: 'partidas',
@@ -14,7 +22,7 @@ module.exports = {
 
             const onlyRecMembers = [...message.guild.members.cache.values()]
                 .filter(member => !member.user.bot)
-                .filter(member => member.roles.cache.some(role => role.name.trim().toLowerCase() === ONLY_REC_ROLE_NAME));
+                .filter(member => member.roles.cache.some(isOnlyRecRole));
 
             if (onlyRecMembers.length === 0) {
                 return message.channel.send('⚠️ Nenhum jogador com o cargo **(ONLY REC)** foi encontrado.');
