@@ -1,4 +1,14 @@
 const Canvas = require('canvas');
+const path = require('path');
+
+Canvas.registerFont(path.join(__dirname, '..', 'assets', 'fonts', 'Lato-Regular.ttf'), {
+    family: 'Lato',
+    weight: 'normal'
+});
+Canvas.registerFont(path.join(__dirname, '..', 'assets', 'fonts', 'Lato-Bold.ttf'), {
+    family: 'Lato',
+    weight: 'bold'
+});
 
 async function generateRosterImage(team1, team2) {
     const canvas = Canvas.createCanvas(1000, 700);
@@ -8,11 +18,11 @@ async function generateRosterImage(team1, team2) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 40px Arial';
+    ctx.font = 'bold 40px Lato';
     ctx.textAlign = 'center';
     ctx.fillText('Only REC', canvas.width / 2, 60);
 
-    ctx.font = 'bold 30px Arial';
+    ctx.font = 'bold 30px Lato';
     ctx.fillStyle = '#3498db'; 
     ctx.fillText('TIME 1', 250, 120);
     ctx.fillStyle = '#e74c3c'; 
@@ -34,12 +44,12 @@ async function generateRosterImage(team1, team2) {
         ctx.fillStyle = isTeamB ? '#e74c3c' : '#3498db';
         ctx.fillRect(x + 100, y + 20, 45, 25);
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 16px Arial';
+        ctx.font = 'bold 16px Lato';
         ctx.textAlign = 'center';
         ctx.fillText(position, x + 122, y + 38);
 
         ctx.textAlign = 'left';
-        ctx.font = 'bold 24px Arial';
+        ctx.font = 'bold 24px Lato';
         if (player) {
             ctx.fillStyle = '#ffffff';
             ctx.fillText(player.name, x + 100, y + 75);
@@ -69,7 +79,7 @@ async function generateRosterImage(team1, team2) {
             ctx.arc(x + 50, y + 45, 30, 0, Math.PI * 2, true);
             ctx.fill();
             ctx.fillStyle = '#777';
-            ctx.font = 'bold 20px Arial';
+            ctx.font = 'bold 20px Lato';
             ctx.textAlign = 'center';
             ctx.fillText('?', x + 50, y + 52);
         }

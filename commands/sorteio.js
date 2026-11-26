@@ -46,16 +46,6 @@ module.exports = {
 
         shuffleArray(players);
 
-        const assignPositions = (teamPlayers, missingPosition) => {
-            const assignments = findPositionAssignment(teamPlayers, missingPosition, false);
-            if (!assignments) return null;
-
-            return assignments.players.map((player, index) => ({
-                ...player,
-                assignedPosition: assignments.positions[index]
-            }));
-        };
-
         const balancedTeams = chooseBalancedTeams(players, teamSize);
         if (!balancedTeams) {
             const missingInfo = getMissingPositions(players);
@@ -141,6 +131,16 @@ function shuffleArray(array) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
+}
+
+function assignPositions(teamPlayers, missingPosition) {
+    const assignments = findPositionAssignment(teamPlayers, missingPosition, false);
+    if (!assignments) return null;
+
+    return assignments.players.map((player, index) => ({
+        ...player,
+        assignedPosition: assignments.positions[index]
+    }));
 }
 
 function getMissingPositions(players) {
@@ -256,3 +256,7 @@ function chooseBalancedTeams(players, teamSize) {
         missingPosition: bestMissingPosition
     };
 }
+
+module.exports.shuffleArray = shuffleArray;
+module.exports.assignPositions = assignPositions;
+module.exports.chooseBalancedTeams = chooseBalancedTeams;
