@@ -93,13 +93,23 @@ async function drawCardLogo(ctx, x, y, maxWidth, maxHeight) {
 }
 
 async function loadPlayerAvatar(member) {
-    const url = member.displayAvatarURL({ extension: 'png', size: 96, forceStatic: true });
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`O Discord respondeu com status ${response.status} ao buscar o avatar.`);
+    const options = { extension: 'png', size: 128, forceStatic: true };
+    const urls = [
+        member.avatarURL(options),
+        member.user.displayAvatarURL(options)
+    ].filter((url, index, allUrls) => url && allUrls.indexOf(url) === index);
+    let lastError;
+
+    for (const url of urls) {
+        try {
+            return await Canvas.loadImage(url);
+        } catch (error) {
+            lastError = error;
+        }
     }
 
-    return Canvas.loadImage(Buffer.from(await response.arrayBuffer()));
+    if (lastError) throw lastError;
+    throw new Error('O usuário não possui uma URL de avatar disponível.');
 }
 
 async function generateRosterImage(team1, team2) {
