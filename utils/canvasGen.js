@@ -92,6 +92,16 @@ async function drawCardLogo(ctx, x, y, maxWidth, maxHeight) {
     });
 }
 
+async function loadPlayerAvatar(member) {
+    const url = member.displayAvatarURL({ extension: 'png', size: 96, forceStatic: true });
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`O Discord respondeu com status ${response.status} ao buscar o avatar.`);
+    }
+
+    return Canvas.loadImage(Buffer.from(await response.arrayBuffer()));
+}
+
 async function generateRosterImage(team1, team2) {
     const width = 1000;
     const height = 740;
@@ -271,8 +281,7 @@ async function generateRosterImage(team1, team2) {
 
         if (player?.memberObj?.user) {
             try {
-                const url = player.memberObj.user.displayAvatarURL({ extension: 'png', size: 96 });
-                const avatar = await Canvas.loadImage(url);
+                const avatar = await loadPlayerAvatar(player.memberObj);
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(avatarX, avatarY, avatarRadius, 0, Math.PI * 2);
@@ -281,6 +290,7 @@ async function generateRosterImage(team1, team2) {
                 ctx.restore();
                 avatarLoaded = true;
             } catch (error) {
+                console.warn(`Não foi possível carregar a foto de ${player.name}:`, error);
                 avatarLoaded = false;
             }
         }
