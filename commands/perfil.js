@@ -1,15 +1,20 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const { getDB } = require('../database');
+const { respond } = require('../utils/interactionResponse');
 
 module.exports = {
     name: 'perfil',
     description: 'Mostra o Player Card e as estatísticas de um jogador',
+    data: new SlashCommandBuilder()
+        .setName('perfil')
+        .setDescription('Mostra as estatísticas de um jogador')
+        .addUserOption(option => option
+            .setName('jogador')
+            .setDescription('Jogador que deseja consultar; vazio para ver seu próprio perfil')
+            .setRequired(false)),
     
-    async execute(message, args) {
-        const mentionedUser = message.mentions && typeof message.mentions.users?.first === 'function'
-            ? message.mentions.users.first()
-            : null;
-        const targetUser = mentionedUser || message.author;
+    async execute(interaction) {
+        const targetUser = interaction.options.getUser('jogador') || interaction.user;
         const db = getDB();
 
         const playerStats = db.prepare(`
@@ -19,7 +24,7 @@ module.exports = {
         `).get(targetUser.id);
 
         if (!playerStats || playerStats.wins === null) {
-            return message.reply(`⚠️ Não encontrei estatísticas para **${targetUser.displayName}**. Vá jogar uma partida primeiro!`);
+            return respond(interaction, `⚠️ Não encontrei estatísticas para **${targetUser.displayName}**. Vá jogar uma partida primeiro!`);
         }
 
         const totalGames = playerStats.wins + playerStats.losses;
@@ -38,6 +43,6 @@ module.exports = {
             .setFooter({ text: 'REC do Panela Velha' })
             .setTimestamp();
 
-        await message.channel.send({ embeds: [embed] });
+        await respond(interaction, { embeds: [embed] });
     },
 };

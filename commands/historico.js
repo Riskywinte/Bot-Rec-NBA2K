@@ -1,17 +1,21 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const { getDB } = require('../database');
+const { respond } = require('../utils/interactionResponse');
 
 module.exports = {
     name: 'historico',
     description: 'Mostra as últimas 5 partidas disputadas',
+    data: new SlashCommandBuilder()
+        .setName('historico')
+        .setDescription('Mostra as últimas 5 partidas disputadas'),
     
-    async execute(message, args) {
+    async execute(interaction) {
         const db = getDB();
         
         const matches = db.prepare('SELECT * FROM match_history ORDER BY id DESC LIMIT 5').all();
 
         if (matches.length === 0) {
-            return message.channel.send('📖 Ainda não há histórico de partidas. Vão pra quadra!');
+            return respond(interaction, '📖 Ainda não há histórico de partidas. Vão pra quadra!');
         }
 
         const embed = new EmbedBuilder()
@@ -39,6 +43,6 @@ module.exports = {
             });
         }
 
-        await message.channel.send({ embeds: [embed] });
+        await respond(interaction, { embeds: [embed] });
     },
 };

@@ -1,19 +1,33 @@
+const { SlashCommandBuilder } = require('discord.js');
 const { getDB } = require('../database');
+const { respond } = require('../utils/interactionResponse');
 
 module.exports = {
     name: 'vitoria',
-    description: 'Registra o resultado (Uso: !vitoria time1 ou !vitoria time2)',
+    description: 'Registra o resultado da partida',
+    data: new SlashCommandBuilder()
+        .setName('vitoria')
+        .setDescription('Registra o resultado da partida')
+        .addStringOption(option => option
+            .setName('vencedor')
+            .setDescription('Time vencedor')
+            .setRequired(true)
+            .addChoices(
+                { name: 'TIME 1', value: 'time1' },
+                { name: 'TIME 2', value: 'time2' }
+            )),
 
-    async execute(message, args) {
-        const winnerTeam = args[0]?.toLowerCase();
+    async execute(interaction, winnerOverride = null) {
+        const winnerTeam = winnerOverride ||
+            (interaction.isChatInputCommand() ? interaction.options.getString('vencedor') : null);
 
         if (winnerTeam !== 'time1' && winnerTeam !== 'time2') {
-            return message.channel.send('⚠️ Uso correto: `!vitoria time1` ou `!vitoria time2`');
+            return respond(interaction, '⚠️ Escolha `time1` ou `time2` como vencedor.');
         }
 
-        const match = message.client.activeMatches.get(message.guild.id);
+        const match = interaction.client.activeMatches.get(interaction.guildId);
         if (!match) {
-            return message.channel.send('⚠️ Nenhuma partida ativa encontrada no servidor. Usem o `!sorteio` primeiro.');
+            return respond(interaction, '⚠️ Nenhuma partida ativa encontrada no servidor. Usem o `/sorteio` primeiro.');
         }
 
         const winnersData = winnerTeam === 'time1' ? match.team1Data : match.team2Data;
@@ -42,12 +56,12 @@ module.exports = {
             const team2Members = JSON.stringify(match.team2Data.map(p => ({ name: p.name, position: p.position || 'UNKNOWN' })));
 
             db.prepare(`INSERT INTO match_history (winner_team, team1_members, team2_members) VALUES (?, ?, ?)`).run(winnerTeam, team1Members, team2Members);
-            message.client.activeMatches.delete(message.guild.id);
+            interaction.client.activeMatches.delete(interaction.guildId);
 
-            await message.channel.send(`🏆 O **${winnerTeam.toUpperCase()}** levou a vitória e o resultado foi salvo! Mandem um \`!gg\` para voltar ao lobby.`);
+            await respond(interaction, `🏆 O **${winnerTeam.toUpperCase()}** levou a vitória e o resultado foi salvo! Usem \`/gg\` para voltar ao lobby.`);
         } catch (error) {
             console.error('Erro ao registrar a partida:', error);
-            await message.channel.send('❌ Houve um erro ao processar o resultado da partida.');
+            await respond(interaction, '❌ Houve um erro ao processar o resultado da partida.');
         }
     },
 };

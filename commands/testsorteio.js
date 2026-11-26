@@ -1,12 +1,17 @@
-const { AttachmentBuilder } = require('discord.js');
+const { AttachmentBuilder, SlashCommandBuilder } = require('discord.js');
 const { generateRosterImage } = require('../utils/canvasGen');
 const { shuffleArray, assignPositions, chooseBalancedTeams } = require('./sorteio');
+const { deferReply } = require('../utils/interactionResponse');
 
 module.exports = {
     name: 'testsorteio',
     description: 'Gera uma imagem de sorteio usando jogadores fictícios',
+    data: new SlashCommandBuilder()
+        .setName('testsorteio')
+        .setDescription('Gera uma imagem de sorteio com jogadores fictícios'),
 
-    async execute(message) {
+    async execute(interaction) {
+        await deferReply(interaction);
         const positionSets = [
             ['PG', 'SG'],
             ['PG', 'SF'],
@@ -41,7 +46,7 @@ module.exports = {
         const imageBuffer = await generateRosterImage(team1, team2);
         const attachment = new AttachmentBuilder(imageBuffer, { name: 'rec-matchup-teste.png' });
 
-        await message.channel.send({
+        await interaction.editReply({
             content: '🧪 **Imagem de teste do sorteio**\nJogadores fictícios; ninguém será movido de canal.',
             files: [attachment]
         });

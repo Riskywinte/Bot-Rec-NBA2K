@@ -1,23 +1,28 @@
-const { ChannelType } = require('discord.js');
+const { ChannelType, SlashCommandBuilder } = require('discord.js');
+const { deferReply, respond } = require('../utils/interactionResponse');
 
 module.exports = {
     name: 'gg',
     description: 'Finaliza os jogos e traz todos de volta para o LOBBY',
+    data: new SlashCommandBuilder()
+        .setName('gg')
+        .setDescription('Finaliza os jogos e traz todos de volta para o LOBBY'),
     
-    async execute(message, args) {
-        const lobbyChannel = message.guild.channels.cache.find(c => c.name === 'LOBBY' && c.type === ChannelType.GuildVoice);
-        const channelTeam1 = message.guild.channels.cache.find(c => c.name === 'TIME 1' && c.type === ChannelType.GuildVoice);
-        const channelTeam2 = message.guild.channels.cache.find(c => c.name === 'TIME 2' && c.type === ChannelType.GuildVoice);
+    async execute(interaction) {
+        const lobbyChannel = interaction.guild.channels.cache.find(c => c.name === 'LOBBY' && c.type === ChannelType.GuildVoice);
+        const channelTeam1 = interaction.guild.channels.cache.find(c => c.name === 'TIME 1' && c.type === ChannelType.GuildVoice);
+        const channelTeam2 = interaction.guild.channels.cache.find(c => c.name === 'TIME 2' && c.type === ChannelType.GuildVoice);
 
-        if (message.client.activeMatches.has(message.guild.id)) {
-            return message.channel.send('⚠️ **A partida ainda não teve vencedor declarado.** Declare um Vencedor antes de `!gg` ou `!fim`.');
+        if (interaction.client.activeMatches.has(interaction.guildId)) {
+            return respond(interaction, '⚠️ **A partida ainda não teve vencedor declarado.** Declare um vencedor antes de `/gg` ou `/fechartemporada`.');
         }
 
         if (!lobbyChannel || !channelTeam1 || !channelTeam2) {
-            return message.channel.send('⚠️ **Erro:** Não encontrei os canais de voz necessários (LOBBY, TIME 1 ou TIME 2).');
+            return respond(interaction, '⚠️ **Erro:** Não encontrei os canais de voz necessários (LOBBY, TIME 1 ou TIME 2).');
         }
 
-        const loadingMessage = await message.channel.send('🏁 **Partida finalizada!** Trazendo os times de volta para a resenha no LOBBY...');
+        await deferReply(interaction);
+        const loadingMessage = await interaction.editReply('🏁 **Partida finalizada!** Trazendo os times de volta para a resenha no LOBBY...');
         let movedCount = 0;
 
         try {

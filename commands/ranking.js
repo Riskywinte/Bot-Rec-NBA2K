@@ -1,23 +1,37 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
 const { getDB } = require('../database');
+const { deferReply, respond } = require('../utils/interactionResponse');
 
 module.exports = {
     name: 'ranking',
     description: 'Mostra os maiores paneleiros do servidor ou filtra por posição',
+    data: new SlashCommandBuilder()
+        .setName('ranking')
+        .setDescription('Mostra o ranking geral ou filtra por posição')
+        .addStringOption(option => option
+            .setName('posicao')
+            .setDescription('Filtra o ranking por posição')
+            .setRequired(false)
+            .addChoices(
+                { name: 'PG', value: 'PG' },
+                { name: 'SG', value: 'SG' },
+                { name: 'SF', value: 'SF' },
+                { name: 'PF', value: 'PF' },
+                { name: 'C', value: 'C' }
+            )),
     
-    async execute(message, args) {
-        const positionFilter = args[0]?.toUpperCase();
+    async execute(interaction, positionOverride = null) {
+        const selectedPosition = positionOverride ||
+            (interaction.isChatInputCommand() ? interaction.options.getString('posicao') : null);
+        const positionFilter = selectedPosition?.toUpperCase();
         const validPositions = ['PG', 'SG', 'SF', 'PF', 'C'];
 
-        let loadingMessage;
-        if (message.channel && !message.isInteractionMock) {
-            loadingMessage = await message.channel.send('📊 Buscando dados na panela...');
-        }
+        await deferReply(interaction);
 
         try {
             const db = getDB(); 
             let allPlayers = [];
-            const embed = new EmbedBuilder().setThumbnail(message.guild.iconURL({ dynamic: true }));
+            const embed = new EmbedBuilder().setThumbnail(interaction.guild.iconURL({ dynamic: true }));
             let rankingText = '';
             let count = 0;
 
@@ -30,10 +44,10 @@ module.exports = {
                 
                 if (allPlayers.length > 0) {
                     const playersIds = allPlayers.map(p => p.discordId);
-                    await message.guild.members.fetch({ user: playersIds }).catch(console.error);
+                    await interaction.guild.members.fetch({ user: playersIds }).catch(console.error);
 
                     for (const p of allPlayers) {
-                        const member = message.guild.members.cache.get(p.discordId);
+                        const member = interaction.guild.members.cache.get(p.discordId);
                         const userName = member ? member.displayName : 'Jogador Desconhecido';
                         
                         const totalGames = p.wins + p.losses;
@@ -60,10 +74,10 @@ module.exports = {
 
                 if (allPlayers.length > 0) {
                     const playersIds = allPlayers.map(p => p.discordId);
-                    await message.guild.members.fetch({ user: playersIds }).catch(console.error);
+                    await interaction.guild.members.fetch({ user: playersIds }).catch(console.error);
 
                     for (const p of allPlayers) {
-                        const member = message.guild.members.cache.get(p.discordId);
+                        const member = interaction.guild.members.cache.get(p.discordId);
                         const userName = member ? member.displayName : 'Jogador Desconhecido';
                         
                         const totalGames = p.wins + p.losses;
@@ -96,17 +110,11 @@ module.exports = {
                 new ButtonBuilder().setCustomId('btn_rank_c').setLabel('C').setStyle(ButtonStyle.Primary)
             );
 
-            if (loadingMessage) await loadingMessage.delete().catch(() => null);
-            
-            if (message.isInteractionMock) {
-                await message.replyObj({ embeds: [embed], components: [rowFiltros, rowFiltros2] });
-            } else {
-                await message.channel.send({ embeds: [embed], components: [rowFiltros, rowFiltros2] });
-            }
+            await interaction.editReply({ embeds: [embed], components: [rowFiltros, rowFiltros2] });
 
         } catch (error) {
             console.error('Erro ao gerar ranking:', error);
-            if (loadingMessage) await loadingMessage.edit('❌ Erro ao buscar o ranking no banco de dados.').catch(() => null);
+            await respond(interaction, '❌ Erro ao buscar o ranking no banco de dados.');
         }
     },
 };

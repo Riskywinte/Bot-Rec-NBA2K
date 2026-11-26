@@ -2,8 +2,10 @@
   "name": "bot-rec-nba2k",
   "version": "1.0.0",
   "description": "",
-  "main": "BotRecNBA2K.js",
+  "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "deploy-commands": "node deploy-commands.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

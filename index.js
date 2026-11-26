@@ -8,9 +8,7 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.GuildMembers
     ]
 });
 
@@ -23,82 +21,48 @@ const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('
 
 for (const file of commandFiles) {
     const command = require(path.join(commandsPath, file));
-    if (command.name) {
-        client.commands.set(command.name, command);
+    if (command.data && typeof command.execute === 'function') {
+        client.commands.set(command.data.name, command);
     }
 }
 
 client.once(Events.ClientReady, () => {
     getDB();
-    console.log(`✅ Bot online como ${client.user.tag} operando com prefixo (!)`);
+    console.log(`✅ Bot online como ${client.user.tag} com comandos slash.`);
 });
-
-const PREFIX = '!';
-
-client.on('messageCreate', async message => {
-    if (!message.content.startsWith(PREFIX) || message.author.bot) return;
-
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const commandName = args.shift().toLowerCase();
-
-    const command = client.commands.get(commandName);
-    if (!command) return;
-
-    try {
-        await command.execute(message, args);
-    } catch (error) {
-        console.error(error);
-        message.reply('Houve um erro ao executar este comando!');
-    }
-});
-
 
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isButton()) return;
-
-
-    const mockMessage = {
-        client: interaction.client,
-        guild: interaction.guild,
-        channel: interaction.channel,
-        member: interaction.member,
-        author: interaction.user,
-        isInteractionMock: true,
-        replyObj: (data) => interaction.editReply(data),
-        mentions: { users: new Map() },
-        reply: (content) => interaction.reply({ content, ephemeral: true })
-    };
-
     try {
+        if (interaction.isChatInputCommand()) {
+            const command = client.commands.get(interaction.commandName);
+            if (!command) {
+                return interaction.reply({ content: 'Comando não encontrado.', ephemeral: true });
+            }
+
+            await command.execute(interaction);
+            return;
+        }
+
+        if (!interaction.isButton()) return;
 
         if (interaction.customId === 'btn_sorteio') {
             await interaction.deferUpdate();
-            const cmd = client.commands.get('sorteio');
-            await cmd.execute(mockMessage, []);
-        }
-        else if (interaction.customId === 'btn_cancelar') {
+            await client.commands.get('sorteio').execute(interaction);
+        } else if (interaction.customId === 'btn_cancelar') {
             await interaction.deferUpdate();
-            const cmd = client.commands.get('cancelar');
-            await cmd.execute(mockMessage, []);
-        }
-        else if (interaction.customId === 'btn_ranking') {
+            await client.commands.get('cancelar').execute(interaction);
+        } else if (interaction.customId === 'btn_ranking') {
             await interaction.deferUpdate();
-            const cmd = client.commands.get('ranking');
-            await cmd.execute(mockMessage, []);
-        }
-
-
-        else if (interaction.customId.startsWith('btn_rank_')) {
+            await client.commands.get('ranking').execute(interaction);
+        } else if (interaction.customId.startsWith('btn_rank_')) {
             await interaction.deferUpdate();
 
             const position = interaction.customId.split('_')[2];
-            const args = position === 'geral' ? [] : [position.toUpperCase()];
-
-            const cmd = client.commands.get('ranking');
-            await cmd.execute(mockMessage, args);
-        }
-        else if (interaction.customId === 'btn_vitoria_time1' || interaction.customId === 'btn_vitoria_time2') {
-
+            await client.commands.get('ranking').execute(
+                interaction,
+                position === 'geral' ? null : position.toUpperCase()
+            );
+        } else if (interaction.customId === 'btn_vitoria_time1' || interaction.customId === 'btn_vitoria_time2') {
             const match = client.activeMatches.get(interaction.guild.id);
             if (!match) {
                 return interaction.reply({ content: '⚠️ Não há nenhuma partida ativa no momento para registrar vitória.', ephemeral: true });
@@ -115,15 +79,19 @@ client.on('interactionCreate', async interaction => {
             await interaction.editReply({ components: [] });
 
             const winner = interaction.customId === 'btn_vitoria_time1' ? 'time1' : 'time2';
-            const cmd = client.commands.get('vitoria');
-
-            await cmd.execute(mockMessage, [winner]);
+            await client.commands.get('vitoria').execute(interaction, winner);
         }
-
     } catch (error) {
-        console.error('Erro na interação do botão:', error);
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: '❌ Ocorreu um erro ao processar o botão.', ephemeral: true });
+        console.error('Erro ao processar interação:', error);
+        if (interaction.isRepliable()) {
+            const response = { content: '❌ Ocorreu um erro ao processar esta interação.', ephemeral: true };
+            if (interaction.isChatInputCommand() && interaction.deferred) {
+                await interaction.editReply(response);
+            } else if (interaction.replied || interaction.deferred) {
+                await interaction.followUp(response);
+            } else {
+                await interaction.reply(response);
+            }
         }
     }
 });
