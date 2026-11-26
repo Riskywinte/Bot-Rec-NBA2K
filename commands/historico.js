@@ -1,6 +1,7 @@
-const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { AttachmentBuilder, EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const { getDB } = require('../database');
-const { respond } = require('../utils/interactionResponse');
+const { generateHistoryImage } = require('../utils/canvasGen');
+const { deferReply, respond } = require('../utils/interactionResponse');
 
 module.exports = {
     name: 'historico',
@@ -8,41 +9,39 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('historico')
         .setDescription('Mostra as últimas 5 partidas disputadas'),
-    
+
     async execute(interaction) {
-        const db = getDB();
-        
-        const matches = db.prepare('SELECT * FROM match_history ORDER BY id DESC LIMIT 5').all();
+        await deferReply(interaction);
 
-        if (matches.length === 0) {
-            return respond(interaction, '📖 Ainda não há histórico de partidas. Vão pra quadra!');
-        }
-
-        const embed = new EmbedBuilder()
-            .setTitle('📖 Últimas Partidas - Panela Velha')
-            .setColor('#9b59b6')
-            .setDescription('Confira os resultados recentes:');
-
-        for (const match of matches) {
-            const date = new Date(match.timestamp + 'Z'); 
-            const discordTime = `<t:${Math.floor(date.getTime() / 1000)}:R>`;
-
-            const team1 = match.team1_members ? JSON.parse(match.team1_members) : [];
-            const team2 = match.team2_members ? JSON.parse(match.team2_members) : [];
-
-            const positionOrder = { PG: 0, SG: 1, SF: 2, PF: 3, C: 4 };
-            const formatTeam = (team) => [...team]
-                .sort((a, b) => (positionOrder[a.position] ?? 99) - (positionOrder[b.position] ?? 99))
-                .map(player => `• ${player.name} (${player.position})`)
-                .join('\n') || 'Nenhum jogador registrado.';
-
-            embed.addFields({
-                name: `Partida #${match.id} - ${discordTime}`,
-                value: `🏆 Vencedor: **${match.winner_team.toUpperCase()}**\n\n**TIME 1**\n${formatTeam(team1)}\n\n**TIME 2**\n${formatTeam(team2)}`,
-                inline: false
+        try {
+            const db = getDB();
+            const matches = db.prepare('SELECT * FROM match_history ORDER BY id DESC LIMIT 5').all();
+            const imageMatches = matches.map(match => {
+                const timestamp = new Date(`${match.timestamp}Z`);
+                return {
+                    id: match.id,
+                    date: Number.isNaN(timestamp.getTime())
+                        ? String(match.timestamp || '')
+                        : timestamp.toLocaleString('pt-BR'),
+                    winner: match.winner_team,
+                    team1: match.team1_members ? JSON.parse(match.team1_members) : [],
+                    team2: match.team2_members ? JSON.parse(match.team2_members) : []
+                };
             });
-        }
+            const image = await generateHistoryImage(imageMatches);
+            const attachment = new AttachmentBuilder(image, { name: 'historico.png' });
+            const embed = new EmbedBuilder()
+                .setColor('#ff6b24')
+                .setImage('attachment://historico.png');
 
-        await respond(interaction, { embeds: [embed] });
+            await interaction.editReply({
+                content: '📖 **Últimas partidas disputadas**',
+                embeds: [embed],
+                files: [attachment]
+            });
+        } catch (error) {
+            console.error('Erro ao gerar histórico de partidas:', error);
+            await respond(interaction, '❌ Não foi possível consultar os resultados ou gerar a imagem do histórico.');
+        }
     },
 };

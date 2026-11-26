@@ -6,6 +6,92 @@ const assetsPath = path.join(__dirname, '..', 'assets');
 const backgroundPath = path.join(assetsPath, 'background.png');
 const logoPath = path.join(assetsPath, 'logo.png');
 
+function drawCardPanel(ctx, x, y, width, height, radius = 16, fill = 'rgba(20, 9, 9, 0.92)') {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + width, y, x + width, y + height, radius);
+    ctx.arcTo(x + width, y + height, x, y + height, radius);
+    ctx.arcTo(x, y + height, x, y, radius);
+    ctx.arcTo(x, y, x + width, y, radius);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 83, 37, 0.78)';
+    ctx.stroke();
+}
+
+function drawCardText(ctx, text, x, y, options = {}) {
+    const {
+        font = '16px sans-serif',
+        color = '#fff4ed',
+        align = 'left',
+        maxWidth
+    } = options;
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    ctx.textBaseline = 'alphabetic';
+
+    let displayText = String(text);
+    if (maxWidth && ctx.measureText(displayText).width > maxWidth) {
+        while (displayText.length > 1 && ctx.measureText(`${displayText}…`).width > maxWidth) {
+            displayText = displayText.slice(0, -1);
+        }
+        displayText += '…';
+    }
+
+    ctx.fillText(displayText, x, y);
+}
+
+async function drawCardBackground(ctx, width, height) {
+    if (fs.existsSync(backgroundPath)) {
+        const background = await Canvas.loadImage(backgroundPath);
+        const scale = Math.max(width / background.width, height / background.height);
+        const backgroundWidth = background.width * scale;
+        const backgroundHeight = background.height * scale;
+        ctx.drawImage(
+            background,
+            (width - backgroundWidth) / 2,
+            (height - backgroundHeight) / 2,
+            backgroundWidth,
+            backgroundHeight
+        );
+    } else {
+        const gradient = ctx.createLinearGradient(0, 0, width, height);
+        gradient.addColorStop(0, '#0b0608');
+        gradient.addColorStop(0.7, '#1b0908');
+        gradient.addColorStop(1, '#a9300b');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+    }
+
+    ctx.fillStyle = 'rgba(10, 4, 5, 0.48)';
+    ctx.fillRect(0, 0, width, height);
+    const glow = ctx.createRadialGradient(width / 2, height + 60, 10, width / 2, height + 60, width * 0.7);
+    glow.addColorStop(0, 'rgba(255, 78, 20, 0.78)');
+    glow.addColorStop(1, 'rgba(255, 78, 20, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, height * 0.45, width, height * 0.55);
+}
+
+async function drawCardLogo(ctx, x, y, maxWidth, maxHeight) {
+    if (fs.existsSync(logoPath)) {
+        const logo = await Canvas.loadImage(logoPath);
+        const scale = Math.min(maxWidth / logo.width, maxHeight / logo.height);
+        const logoWidth = logo.width * scale;
+        const logoHeight = logo.height * scale;
+        ctx.drawImage(logo, x + (maxWidth - logoWidth) / 2, y + (maxHeight - logoHeight) / 2, logoWidth, logoHeight);
+        return;
+    }
+
+    drawCardText(ctx, 'ONLY REC', x + maxWidth / 2, y + maxHeight / 2, {
+        font: 'bold 22px sans-serif',
+        color: '#ff6b24',
+        align: 'center'
+    });
+}
+
 async function generateRosterImage(team1, team2) {
     const width = 1000;
     const height = 740;
@@ -478,4 +564,256 @@ async function generateProfileImage(profile) {
     return canvas.toBuffer('image/png');
 }
 
-module.exports = { generateRosterImage, generateProfileImage };
+async function generateRankingImage(ranking) {
+    const width = 1200;
+    const rowHeight = 61;
+    const hasPlayers = ranking.players.length > 0;
+    const height = hasPlayers
+        ? 206 + ranking.players.length * rowHeight + 24
+        : 356;
+    const canvas = Canvas.createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+    await drawCardBackground(ctx, width, height);
+
+    drawCardPanel(ctx, 40, 30, 1120, 126, 23);
+    await drawCardLogo(ctx, 58, 42, 136, 100);
+    const positionLabel = ranking.position ? `POSIÇÃO ${ranking.position}` : 'GERAL';
+    drawCardText(ctx, `RANKING ${positionLabel}`, 215, 91, {
+        font: 'italic bold 37px sans-serif',
+        color: '#fff4ed',
+        maxWidth: 570
+    });
+    drawCardText(ctx, `${positionLabel}  ·  SEASON ${ranking.season}  ·  ORDENADO POR VITÓRIAS`, 218, 124, {
+        font: 'bold 14px sans-serif',
+        color: '#b69b8e',
+        maxWidth: 570
+    });
+
+    const summaryCards = [
+        { label: 'JOGADORES', value: ranking.playerCount },
+        { label: 'JOGOS INDIVIDUAIS', value: ranking.totalGames }
+    ];
+    summaryCards.forEach((card, index) => {
+        const x = 850 + index * 143;
+        drawCardPanel(ctx, x, 54, 130, 76, 14, 'rgba(31, 12, 10, 0.9)');
+        drawCardText(ctx, card.value, x + 65, 91, {
+            font: 'bold 28px sans-serif',
+            color: '#ff762c',
+            align: 'center'
+        });
+        drawCardText(ctx, card.label, x + 65, 116, {
+            font: 'bold 10px sans-serif',
+            color: '#b69b8e',
+            align: 'center'
+        });
+    });
+
+    if (!hasPlayers) {
+        drawCardPanel(ctx, 40, 177, 1120, 145, 22);
+        drawCardText(ctx, ranking.position ? `NENHUM JOGADOR DE ${ranking.position} NO RANKING` : 'NENHUM JOGADOR NO RANKING AINDA', 600, 237, {
+            font: 'italic bold 29px sans-serif',
+            color: '#fff4ed',
+            align: 'center',
+            maxWidth: 1040
+        });
+        drawCardText(ctx, 'AINDA NÃO HÁ PARTIDAS REGISTRADAS NESTA TEMPORADA. USE /VITORIA PARA COMEÇAR O RANKING.', 600, 276, {
+            font: 'bold 13px sans-serif',
+            color: '#b69b8e',
+            align: 'center',
+            maxWidth: 1020
+        });
+        return canvas.toBuffer('image/png');
+    }
+
+    const headers = [
+        { label: '#', x: 78, align: 'center' },
+        { label: 'JOGADOR', x: 135, align: 'left' },
+        { label: 'VITÓRIAS', x: 696, align: 'center' },
+        { label: 'DERROTAS', x: 824, align: 'center' },
+        { label: 'PARTIDAS', x: 952, align: 'center' },
+        { label: '% VITÓRIAS', x: 1084, align: 'center' }
+    ];
+    headers.forEach(header => {
+        drawCardText(ctx, header.label, header.x, 183, {
+            font: 'bold 12px sans-serif',
+            color: '#b69b8e',
+            align: header.align
+        });
+    });
+
+    ranking.players.forEach((player, index) => {
+        const y = 194 + index * rowHeight;
+        drawCardPanel(
+            ctx,
+            40,
+            y,
+            1120,
+            54,
+            13,
+            index % 2 === 0 ? 'rgba(23, 9, 9, 0.92)' : 'rgba(38, 13, 10, 0.92)'
+        );
+        const rankColor = index < 3 ? ['#ffcc55', '#d6dce0', '#e49760'][index] : '#b69b8e';
+        drawCardText(ctx, `${index + 1}`, 78, y + 34, {
+            font: 'bold 20px sans-serif',
+            color: rankColor,
+            align: 'center'
+        });
+        drawCardText(ctx, player.name, 135, y + 34, {
+            font: 'bold 20px sans-serif',
+            color: '#fff4ed',
+            maxWidth: 500
+        });
+        drawCardText(ctx, player.wins, 696, y + 34, {
+            font: 'bold 20px sans-serif',
+            color: '#ff762c',
+            align: 'center'
+        });
+        drawCardText(ctx, player.losses, 824, y + 34, {
+            font: 'bold 20px sans-serif',
+            color: '#fff4ed',
+            align: 'center'
+        });
+        drawCardText(ctx, player.games, 952, y + 34, {
+            font: 'bold 20px sans-serif',
+            color: '#fff4ed',
+            align: 'center'
+        });
+        drawCardText(ctx, `${player.winRate}%`, 1084, y + 34, {
+            font: 'bold 20px sans-serif',
+            color: '#ff762c',
+            align: 'center'
+        });
+    });
+
+    return canvas.toBuffer('image/png');
+}
+
+async function generateHistoryImage(matches) {
+    const width = 1200;
+    const headerHeight = 152;
+    const matchHeight = 206;
+    const height = matches.length > 0
+        ? headerHeight + matches.length * matchHeight + 20
+        : 360;
+    const canvas = Canvas.createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+    await drawCardBackground(ctx, width, height);
+
+    drawCardPanel(ctx, 40, 30, 1120, 104, 22);
+    await drawCardLogo(ctx, 56, 38, 130, 88);
+    drawCardText(ctx, 'HISTÓRICO DE PARTIDAS', 205, 82, {
+        font: 'italic bold 35px sans-serif',
+        color: '#fff4ed',
+        maxWidth: 650
+    });
+    drawCardText(ctx, 'ÚLTIMOS 5 RESULTADOS  ·  TIMES ORDENADOS POR POSIÇÃO', 208, 112, {
+        font: 'bold 13px sans-serif',
+        color: '#b69b8e',
+        maxWidth: 650
+    });
+    drawCardPanel(ctx, 930, 48, 196, 68, 13, 'rgba(31, 12, 10, 0.9)');
+    drawCardText(ctx, matches.length, 1028, 80, {
+        font: 'bold 25px sans-serif',
+        color: '#ff762c',
+        align: 'center'
+    });
+    drawCardText(ctx, 'PARTIDAS', 1028, 103, {
+        font: 'bold 10px sans-serif',
+        color: '#b69b8e',
+        align: 'center'
+    });
+
+    if (matches.length === 0) {
+        drawCardPanel(ctx, 40, 158, 1120, 150, 22);
+        drawCardText(ctx, 'NENHUMA PARTIDA REGISTRADA', 600, 220, {
+            font: 'italic bold 30px sans-serif',
+            color: '#fff4ed',
+            align: 'center'
+        });
+        drawCardText(ctx, 'OS RESULTADOS DAS PARTIDAS APARECERÃO AQUI.', 600, 260, {
+            font: 'bold 14px sans-serif',
+            color: '#b69b8e',
+            align: 'center'
+        });
+        return canvas.toBuffer('image/png');
+    }
+
+    const positionOrder = { PG: 0, SG: 1, SF: 2, PF: 3, C: 4 };
+    matches.forEach((match, index) => {
+        const y = headerHeight + index * matchHeight;
+        drawCardPanel(ctx, 40, y, 1120, 190, 18);
+
+        drawCardText(ctx, `PARTIDA #${match.id}`, 64, y + 31, {
+            font: 'bold 20px sans-serif',
+            color: '#fff4ed'
+        });
+        drawCardText(ctx, match.date, 256, y + 30, {
+            font: 'bold 13px sans-serif',
+            color: '#b69b8e',
+            maxWidth: 540
+        });
+
+        const winningTeam = String(match.winner || '').toLowerCase();
+        const winnerLabel = winningTeam === 'time1' || winningTeam === 'time2'
+            ? `VENCEDOR: ${winningTeam.toUpperCase()}`
+            : 'RESULTADO REGISTRADO';
+        drawCardText(ctx, winnerLabel, 1128, y + 30, {
+            font: 'bold 13px sans-serif',
+            color: '#ff762c',
+            align: 'right',
+            maxWidth: 300
+        });
+
+        const teamCards = [
+            { label: 'TIME 1', players: match.team1, x: 58, winner: winningTeam === 'time1', accent: '#ff5a3c' },
+            { label: 'TIME 2', players: match.team2, x: 610, winner: winningTeam === 'time2', accent: '#ffb13b' }
+        ];
+        teamCards.forEach(team => {
+            drawCardPanel(
+                ctx,
+                team.x,
+                y + 46,
+                532,
+                126,
+                13,
+                team.winner ? 'rgba(68, 22, 12, 0.95)' : 'rgba(22, 10, 9, 0.94)'
+            );
+            drawCardText(ctx, team.label, team.x + 16, y + 70, {
+                font: 'bold 14px sans-serif',
+                color: team.accent
+            });
+            const orderedPlayers = [...team.players].sort(
+                (a, b) => (positionOrder[String(a.position).toUpperCase()] ?? 99) -
+                    (positionOrder[String(b.position).toUpperCase()] ?? 99)
+            );
+            if (orderedPlayers.length === 0) {
+                drawCardText(ctx, 'JOGADORES NÃO REGISTRADOS', team.x + 16, y + 112, {
+                    font: 'bold 13px sans-serif',
+                    color: '#b69b8e'
+                });
+            } else {
+                orderedPlayers.slice(0, 5).forEach((player, playerIndex) => {
+                    const position = String(player.position || '??').toUpperCase();
+                    drawCardText(ctx, position, team.x + 18, y + 95 + playerIndex * 15, {
+                        font: 'bold 11px sans-serif',
+                        color: team.accent
+                    });
+                    drawCardText(ctx, player.name || 'Jogador', team.x + 60, y + 95 + playerIndex * 15, {
+                        font: 'bold 12px sans-serif',
+                        color: '#fff4ed',
+                        maxWidth: 450
+                    });
+                });
+            }
+        });
+    });
+
+    return canvas.toBuffer('image/png');
+}
+
+module.exports = {
+    generateRosterImage,
+    generateProfileImage,
+    generateRankingImage,
+    generateHistoryImage
+};

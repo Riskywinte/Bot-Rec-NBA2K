@@ -1,5 +1,6 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
+const { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
 const { getDB } = require('../database');
+const { generateRankingImage } = require('../utils/canvasGen');
 const { deferReply, respond } = require('../utils/interactionResponse');
 
 module.exports = {
@@ -19,85 +20,80 @@ module.exports = {
                 { name: 'PF', value: 'PF' },
                 { name: 'C', value: 'C' }
             )),
-    
+
     async execute(interaction, positionOverride = null) {
         const selectedPosition = positionOverride ||
             (interaction.isChatInputCommand() ? interaction.options.getString('posicao') : null);
         const positionFilter = selectedPosition?.toUpperCase();
         const validPositions = ['PG', 'SG', 'SF', 'PF', 'C'];
+        const filteredPosition = validPositions.includes(positionFilter) ? positionFilter : null;
 
         await deferReply(interaction);
 
         try {
-            const db = getDB(); 
-            let allPlayers = [];
-            const embed = new EmbedBuilder().setThumbnail(interaction.guild.iconURL({ dynamic: true }));
-            let rankingText = '';
-            let count = 0;
-
-            if (positionFilter && validPositions.includes(positionFilter)) {
-                embed.setColor('#3498db');
-                embed.setTitle(`🏀 Top 10 - Posição: ${positionFilter}`);
-                embed.setDescription(`Os melhores **${positionFilter}** do servidor:`);
-                
-                allPlayers = db.prepare(`SELECT * FROM players WHERE position = ? ORDER BY wins DESC LIMIT 10`).all(positionFilter);
-                
-                if (allPlayers.length > 0) {
-                    const playersIds = allPlayers.map(p => p.discordId);
-                    await interaction.guild.members.fetch({ user: playersIds }).catch(console.error);
-
-                    for (const p of allPlayers) {
-                        const member = interaction.guild.members.cache.get(p.discordId);
-                        const userName = member ? member.displayName : 'Jogador Desconhecido';
-                        
-                        const totalGames = p.wins + p.losses;
-                        const winRate = totalGames > 0 ? Math.round((p.wins / totalGames) * 100) : 0;
-                        
-                        rankingText += `**${count + 1}º** ${userName}\n`;
-                        rankingText += `└ 🏆 ${p.wins} V | 💀 ${p.losses} D | 📊 ${winRate}% WR\n\n`;
-                        count++;
-                    }
-                }
-
-            } else {
-                embed.setColor('#f39c12');
-                embed.setTitle('🏀 Leaderboard Geral - REC do Panela Velha');
-                embed.setDescription('Os maiores paneleiros do servidor:');
-                
-                allPlayers = db.prepare(`
-                    SELECT discordId, SUM(wins) as wins, SUM(losses) as losses 
-                    FROM players 
-                    GROUP BY discordId 
-                    ORDER BY wins DESC 
+            const db = getDB();
+            const players = filteredPosition
+                ? db.prepare(`
+                    SELECT discordId, wins, losses
+                    FROM players
+                    WHERE position = ?
+                    ORDER BY wins DESC, losses ASC
+                    LIMIT 10
+                `).all(filteredPosition)
+                : db.prepare(`
+                    SELECT discordId, SUM(wins) as wins, SUM(losses) as losses
+                    FROM players
+                    GROUP BY discordId
+                    ORDER BY wins DESC, losses ASC
                     LIMIT 10
                 `).all();
+            const summary = filteredPosition
+                ? db.prepare(`
+                    SELECT COUNT(DISTINCT discordId) as playerCount,
+                        COALESCE(SUM(wins + losses), 0) as totalGames
+                    FROM players
+                    WHERE position = ?
+                `).get(filteredPosition)
+                : db.prepare(`
+                    SELECT COUNT(DISTINCT discordId) as playerCount,
+                        COALESCE(SUM(wins + losses), 0) as totalGames
+                    FROM players
+                `).get();
+            const seasonRow = db.prepare(
+                "SELECT value FROM server_config WHERE key = 'current_season'"
+            ).get();
 
-                if (allPlayers.length > 0) {
-                    const playersIds = allPlayers.map(p => p.discordId);
-                    await interaction.guild.members.fetch({ user: playersIds }).catch(console.error);
-
-                    for (const p of allPlayers) {
-                        const member = interaction.guild.members.cache.get(p.discordId);
-                        const userName = member ? member.displayName : 'Jogador Desconhecido';
-                        
-                        const totalGames = p.wins + p.losses;
-                        const winRate = totalGames > 0 ? Math.round((p.wins / totalGames) * 100) : 0;
-
-                        rankingText += `**${count + 1}º** ${userName}\n`;
-                        rankingText += `└ 🏆 ${p.wins} V | 💀 ${p.losses} D | 📊 ${winRate}% WR\n\n`;
-                        count++;
-                    }
-                }
+            if (players.length > 0) {
+                const playerIds = players.map(player => player.discordId);
+                await interaction.guild.members.fetch({ user: playerIds }).catch(console.error);
             }
 
-            if (count === 0) {
-                rankingText = positionFilter 
-                    ? `Nenhum jogador possui partidas registradas jogando de **${positionFilter}**.` 
-                    : `Ainda não há partidas registradas. Joguem o primeiro jogo!`;
-            }
+            const leaderboard = players.map(player => {
+                const member = interaction.guild.members.cache.get(player.discordId);
+                const games = player.wins + player.losses;
+                return {
+                    name: member ? member.displayName : 'Jogador Desconhecido',
+                    wins: player.wins,
+                    losses: player.losses,
+                    games,
+                    winRate: games > 0 ? Math.round((player.wins / games) * 100) : 0
+                };
+            });
+            const image = await generateRankingImage({
+                position: filteredPosition,
+                season: seasonRow ? seasonRow.value : 1,
+                playerCount: summary.playerCount,
+                totalGames: summary.totalGames,
+                players: leaderboard
+            });
+            const attachment = new AttachmentBuilder(image, { name: 'ranking.png' });
+            const embed = new EmbedBuilder()
+                .setColor('#ff6b24')
+                .setImage('attachment://ranking.png');
 
-            embed.addFields({ name: 'Top Jogadores', value: rankingText });
-
+            const selectedLabel = filteredPosition
+                ? `**${filteredPosition}**`
+                : '**Geral (todas as posições)**';
             const rowFiltros = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId('btn_rank_geral').setLabel('GERAL').setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder().setCustomId('btn_rank_pg').setLabel('PG').setStyle(ButtonStyle.Primary),
@@ -105,13 +101,16 @@ module.exports = {
                 new ButtonBuilder().setCustomId('btn_rank_sf').setLabel('SF').setStyle(ButtonStyle.Primary),
                 new ButtonBuilder().setCustomId('btn_rank_pf').setLabel('PF').setStyle(ButtonStyle.Primary)
             );
-
             const rowFiltros2 = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId('btn_rank_c').setLabel('C').setStyle(ButtonStyle.Primary)
             );
 
-            await interaction.editReply({ embeds: [embed], components: [rowFiltros, rowFiltros2] });
-
+            await interaction.editReply({
+                content: `🏆 **Ranking por posição**\nVendo agora: ${selectedLabel}\nEscolha uma posição para filtrar vitórias, derrotas e aproveitamento.`,
+                embeds: [embed],
+                files: [attachment],
+                components: [rowFiltros, rowFiltros2]
+            });
         } catch (error) {
             console.error('Erro ao gerar ranking:', error);
             await respond(interaction, '❌ Erro ao buscar o ranking no banco de dados.');
