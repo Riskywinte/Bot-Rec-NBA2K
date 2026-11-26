@@ -29,6 +29,33 @@ module.exports = {
                 return respond(interaction, '⚠️ Nenhuma partida foi registrada nesta temporada ainda! Não há o que encerrar.');
             }
 
+            const overallLeader = db.prepare(`
+                SELECT discordId, SUM(wins) as wins
+                FROM players
+                GROUP BY discordId
+                ORDER BY wins DESC
+            `).all();
+            const mostOverallWins = overallLeader[0].wins;
+            const overallLeaders = overallLeader.filter(player => player.wins === mostOverallWins);
+
+            const positionStats = db.prepare(`
+                SELECT position, discordId, SUM(wins) as wins
+                FROM players
+                WHERE position IN ('PG', 'SG', 'SF', 'PF', 'C')
+                GROUP BY position, discordId
+            `).all();
+            const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+            const positionLeaders = positions.map(position => {
+                const players = positionStats.filter(player => player.position === position);
+                if (players.length === 0) return { position, leaders: [] };
+
+                const mostWins = Math.max(...players.map(player => player.wins));
+                return {
+                    position,
+                    leaders: players.filter(player => player.wins === mostWins)
+                };
+            });
+
             await deferReply(interaction);
             const fecharTemporadaTx = db.transaction(() => {
                 
@@ -76,6 +103,30 @@ module.exports = {
             }
 
             embed.addFields({ name: '🌟 Pódio da Temporada (Hall da Fama)', value: podiumText });
+
+            const formatLeaders = async leaders => {
+                const names = await Promise.all(leaders.map(async player => {
+                    const user = await interaction.client.users.fetch(player.discordId).catch(() => null);
+                    return user ? user.displayName : 'Jogador Desconhecido';
+                }));
+                return names.map(name => `**${name}**`).join(', ');
+            };
+
+            const awardLines = [
+                `**Geral (${mostOverallWins} V):** ${await formatLeaders(overallLeaders)}`
+            ];
+            for (const { position, leaders } of positionLeaders) {
+                const mostWins = leaders.length > 0 ? leaders[0].wins : 0;
+                const leaderNames = leaders.length > 0
+                    ? await formatLeaders(leaders)
+                    : 'Nenhuma partida registrada';
+                awardLines.push(`**${position} (${mostWins} V):** ${leaderNames}`);
+            }
+
+            embed.addFields({
+                name: '👑 Líderes de vitórias por posição e geral',
+                value: awardLines.join('\n')
+            });
 
             await interaction.editReply({ content: '@everyone', embeds: [embed] });
 
